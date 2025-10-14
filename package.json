@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "@huggingface/inference": "^4.11.2",
+    "@stacks/blockchain-api-client": "^8.13.1",
     "@stacks/connect": "^8.2.0",
     "@stacks/network": "^7.2.0",
     "@stacks/storage": "^7.2.0",
