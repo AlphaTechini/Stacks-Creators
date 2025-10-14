@@ -1,0 +1,40 @@
+{
+	"name": "frontend",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"lint": "eslint ."
+	},
+	"dependencies": {
+		"near-api-js": "latest",
+		"nanoid": "latest",
+		"@near-wallet-selector/core": "^8.9.1",
+		"@near-wallet-selector/modal-ui": "^8.9.1",
+		"@near-wallet-selector/near-wallet": "^8.9.1",
+		"@near-wallet-selector/here-wallet": "^8.9.1",
+		"buffer": "^6.0.3"
+	},
+	"devDependencies": {
+		"@eslint/compat": "latest",
+		"@eslint/js": "latest",
+		"@sveltejs/adapter-vercel": "latest",
+		"@sveltejs/kit": "latest",
+		"@sveltejs/vite-plugin-svelte": "latest",
+		"@tailwindcss/forms": "latest",
+		"@tailwindcss/typography": "latest",
+		"@tailwindcss/vite": "latest",
+		"@types/node": "latest",
+		"eslint": "latest",
+		"eslint-plugin-svelte": "latest",
+		"globals": "latest",
+		"svelte": "latest",
+		"tailwindcss": "latest",
+		"vite": "latest",
+		"vite-plugin-devtools-json": "latest"
+	}
+}

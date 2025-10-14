@@ -1,0 +1,18 @@
+{
+  "name": "near-creators-contract",
+  "version": "0.1.0",
+  "description": "NEAR SocialFi influencer NFT contract in AssemblyScript",
+  "scripts": {
+    "build": "npm run asbuild:release",
+    "asbuild": "npm run asbuild:debug",
+    "asbuild:debug": "asc assembly/index.ts --binaryFile build/debug.wasm --textFile build/debug.wat --optimize",
+    "asbuild:release": "asc assembly/index.ts --binaryFile build/release.wasm --optimize --noAssert",
+    "test": "asp --nologo"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+  "near-sdk-as": "3.2.3",
+  "assemblyscript": "^0.19.0"
+  }
+}

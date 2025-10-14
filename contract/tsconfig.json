@@ -1,0 +1,3 @@
+{
+  "extends": "near-sdk-as/tsconfig.json"
+}

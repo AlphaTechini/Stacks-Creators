@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@stacks/connect": "^8.2.0",
+    "@stacks/network": "^7.2.0",
+    "@stacks/storage": "^7.2.0",
+    "@stacks/transactions": "^7.2.0",
+    "cloudinary": "^2.7.0"
+  }
+}

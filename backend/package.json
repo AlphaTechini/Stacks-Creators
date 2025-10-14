@@ -1,0 +1,26 @@
+{
+  "name": "near-creators-backend",
+  "version": "0.1.0",
+  "description": "Fastify API for NEAR SocialFi AI image conversion and NFT minting helpers",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fastify/cors": "latest",
+    "@fastify/multipart": "latest",
+    "@fastify/static": "latest",
+    "dotenv": "latest",
+    "fastify": "latest",
+    "near-api-js": "latest",
+    "sharp": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "ts-node": "latest",
+    "tslib": "latest",
+    "typescript": "latest"
+  }
+}
