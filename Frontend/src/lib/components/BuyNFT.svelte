@@ -63,7 +63,9 @@
 
 <style>
   .action-container {
-    /* Styles similar to ListNFT */
+    background: var(--input-background);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
   }
   .price-display {
     margin-bottom: 1rem;

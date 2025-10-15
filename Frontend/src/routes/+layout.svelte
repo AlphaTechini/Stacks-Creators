@@ -10,8 +10,24 @@
 	// Theme store
 	const theme = writable('dark');
 
-	// Initialize the wallet store, which will check localStorage.
-	wallet.initialize();
+	// Svelte 5: Initialize wallet store from localStorage
+	$effect.pre(() => {
+		const storedToken = localStorage.getItem('stacks_token');
+		if (storedToken) {
+			try {
+				const payload = JSON.parse(atob(storedToken.split('.')[1]));
+				if (payload.exp * 1000 > Date.now()) {
+					wallet.set({ stxAddress: payload.sub, token: storedToken, isLoading: false });
+				} else {
+					handleLogout(); // Token expired
+				}
+			} catch (e) {
+				handleLogout(); // Invalid token
+			}
+		} else {
+			wallet.set({ stxAddress: null, token: null, isLoading: false });
+		}
+	});
 
 	// This is a Svelte 4 onMount equivalent for the theme store.
 	// In Svelte 5, you might handle this differently, but this works.

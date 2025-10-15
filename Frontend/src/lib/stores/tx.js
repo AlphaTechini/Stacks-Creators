@@ -1,4 +1,4 @@
-import { writable, get } from 'svelte/store';
+import { writable} from 'svelte/store';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 

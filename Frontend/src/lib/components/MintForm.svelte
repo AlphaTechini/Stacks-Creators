@@ -68,14 +68,14 @@
   {#if result?.success}
     <MintSuccess txId={result.txId} mediaUrl={result.mediaUrl} />
   {:else}
-    <form on:submit|preventDefault={handleSubmit}>
+    <form onsubmit={handleSubmit} use:preventDefault>
       <div class="form-group">
         <label for="file-upload">Artwork</label>
         <input
           id="file-upload"
           type="file"
           accept=".jpg, .jpeg, .png, .gif"
-          on:change={handleFileSelect}
+          onchange={handleFileSelect}
           class="file-input"
         />
         {#if originalFilePreview}
@@ -95,7 +95,8 @@
           bind:value={description}
           rows="4"
           placeholder="A short story about your creation..."
-        />
+        >
+        </textarea>
       </div>
 
       <button type="submit" class="primary" disabled={isMinting || !file}>
@@ -122,10 +123,6 @@
     width: 100%;
     max-width: 600px;
     border: 1px solid var(--card-border);
-  }
-  /* Add other styles from setup-profile.svelte or a global sheet */
-  .form-group, label, input, textarea, button, .error-message {
-    /* These would ideally be in a global stylesheet */
   }
   .artwork-preview {
     max-width: 200px;
