@@ -11,7 +11,3 @@ depends_on = []
 [contracts.marketplace]
 path = "contracts/marketplace.clar"
 depends_on = ["creator-nft"]
-
-[repl]
-repl_file = "lib/clarinet-repl.js"
-costs_version = 2
