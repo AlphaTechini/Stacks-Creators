@@ -4,10 +4,16 @@ authors = []
 description = "Contracts for the Stacks Creators dApp"
 telemetry = true
 
+[contracts.sip009-nft-trait]
+path = "contracts/sip009-nft-trait.clar"
+
 [contracts.creator-nft]
 path = "contracts/creator-nft.clar"
 depends_on = []
 
+[contracts.marketplace]
+path = "contracts/marketplace.clar"
+depends_on = ["creator-nft"]
 [contracts.marketplace]
 path = "contracts/marketplace.clar"
 depends_on = ["creator-nft"]
