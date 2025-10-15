@@ -15,6 +15,11 @@ const nftItemSchema = new Schema(
       required: true,
       index: true,
     },
+    ownerAddress: {
+      type: String,
+      required: true,
+      index: true,
+    },
     imageUrl: { type: String, required: true },
     aiImageUrl: { type: String, required: true },
     price: { type: Number, required: true, min: 0 },
@@ -25,4 +30,3 @@ const nftItemSchema = new Schema(
 );
 
 export const NFTItem = mongoose.model('NFTItem', nftItemSchema);
-

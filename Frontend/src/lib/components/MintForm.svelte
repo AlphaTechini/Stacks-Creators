@@ -1,27 +1,21 @@
 <script>
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
-  import { generateAnimatedImage } from '../../lib/aiService.js';
-  import { uploadToCloudinary, mintNFT } from '../../lib/api.js';
+  import { wallet } from '$lib/stores/wallet.js';
+  import { generateAnimatedImage } from '$lib/aiService.js';
+  import { uploadToCloudinary, mintNFT } from '$lib/api.js';
   import MintSuccess from './MintSuccess.svelte';
 
-  let title = '';
-  let description = '';
-  let file = null;
-  let originalFilePreview = '';
+  let title = $state('');
+  let description = $state('');
+  let file = $state(null);
+  let originalFilePreview = $state('');
 
-  let isMinting = false;
-  let progress = '';
-  let result = null;
-  let errorMessage = '';
-  let token = '';
-
-  onMount(() => {
-    token = localStorage.getItem('stacks_token');
-    if (!token) {
-      goto('/');
-    }
-  });
+  let isMinting = $state(false);
+  let progress = $state('');
+  let result = $state(null);
+  let errorMessage = $state('');
+  
+  // The wallet store provides the token, so we don't need onMount here.
+  // The page containing this form should handle redirecting unauthenticated users.
 
   function handleFileSelect(e) {
     const selectedFile = e.target.files[0];
@@ -46,13 +40,13 @@
       const aiImageBlob = await generateAnimatedImage(file);
 
       progress = "Uploading to Cloudinary...";
-      const cloudinaryRes = await uploadToCloudinary(token, aiImageBlob);
+      const cloudinaryRes = await uploadToCloudinary($wallet.token, aiImageBlob);
       if (!cloudinaryRes.secure_url) {
         throw new Error('Failed to get URL from Cloudinary.');
       }
 
       progress = "Minting NFT on Stacks...";
-      const response = await mintNFT(token, title, description, cloudinaryRes.secure_url);
+      const response = await mintNFT($wallet.token, title, description, cloudinaryRes.secure_url);
 
       if (!response.success) {
         throw new Error(response.error || 'An unknown error occurred during minting.');
@@ -112,7 +106,7 @@
         {/if}
       </button>
 
-      {#if errorMessage && !isMinting}
+      {#if errorMessage && !isMinting && progress.startsWith('Error')}
         <p class="error-message">{errorMessage}</p>
       {/if}
     </form>

@@ -1,15 +1,21 @@
 <script>
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
-	import { onMount } from 'svelte';
 	import { writable } from 'svelte/store';
+	import { wallet } from '$lib/stores/wallet.js';
+	import { handleLogin, handleLogout } from '$lib/stacksClient.js';
 
 	let { children } = $props();
 
 	// Theme store
 	const theme = writable('dark');
 
-	onMount(() => {
+	// Initialize the wallet store, which will check localStorage.
+	wallet.initialize();
+
+	// This is a Svelte 4 onMount equivalent for the theme store.
+	// In Svelte 5, you might handle this differently, but this works.
+	$effect(() => {
 		const storedTheme = localStorage.getItem('theme');
 		if (storedTheme && (storedTheme === 'light' || storedTheme === 'dark')) {
 			theme.set(storedTheme);
@@ -42,9 +48,25 @@
 <header>
 	<div class="header-content">
 		<a href="/" class="logo">✨ Stacks Creators</a>
-		<button class="secondary" onclick={toggleTheme}>
-			Switch to {$theme === 'dark' ? 'Light' : 'Dark'} Mode
-		</button>
+		<div class="controls">
+			{#if $wallet.stxAddress}
+				<a href="/gallery" class="nav-link">Gallery</a>
+				<a href="/dashboard" class="nav-link">Dashboard</a>
+			{/if}
+
+			{#if $wallet.stxAddress}
+				<div class="wallet-info">
+					<span class="address">{$wallet.stxAddress.slice(0, 5)}...{$wallet.stxAddress.slice(-5)}</span>
+					<button class="secondary" onclick={handleLogout}>Disconnect</button>
+				</div>
+			{:else if !$wallet.isLoading}
+				<!-- Connect buttons could go here, or be left on the main page -->
+			{/if}
+
+			<button class="secondary" onclick={toggleTheme}>
+				{$theme === 'dark' ? '☀️' : '🌙'}
+			</button>
+		</div>
 	</div>
 </header>
 
@@ -68,6 +90,25 @@
 		font-size: 1.2rem;
 		color: var(--text-color);
 		text-decoration: none;
+	}
+	.nav-link {
+		color: var(--text-color);
+		text-decoration: none;
+		font-weight: 600;
+	}
+	.controls {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+	.wallet-info {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		background: var(--secondary-color);
+		padding: 0.25rem 0.25rem 0.25rem 0.75rem;
+		border-radius: 999px;
+		border: 1px solid var(--card-border);
 	}
 	main {
 		padding: 0 1.5rem;

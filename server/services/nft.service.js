@@ -85,17 +85,6 @@ export async function mintNFT(creatorAddress, title, description, mediaUrl) {
   const broadcastResult = await broadcastTransaction(transaction);
   const txId = broadcastResult.txid;
 
-  // 4. Save the result to MongoDB
-  const newNft = new NFTItem({
-    tokenId,
-    creatorAddress,
-    imageUrl: mediaUrl,
-    aiImageUrl: mediaUrl, // Placeholder for now
-    price: 0, // Assuming not for sale initially
-    listed: false,
-    txId,
-  });
-  await newNft.save();
-
-  return { txId, tokenId, mediaUrl };
+  // Return only the transaction ID. The listener will handle the DB write.
+  return { txId };
 }

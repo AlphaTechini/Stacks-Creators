@@ -1,47 +1,76 @@
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 /**
- * Uploads a file blob to Cloudinary via our backend.
- * @param {string} token The user's JWT for authentication.
- * @param {Blob} fileBlob The file blob to upload (e.g., the AI-generated image).
- * @returns {Promise<{secure_url: string}>} A promise that resolves with the Cloudinary response.
+ * A helper function for making authenticated API requests.
+ * @param {string} endpoint - The API endpoint to call.
+ * @param {string} method - The HTTP method (GET, POST, etc.).
+ * @param {string} token - The user's JWT.
+ * @param {object} [body] - The request body for POST/PUT requests.
+ * @returns {Promise<any>} The JSON response from the server.
  */
-export async function uploadToCloudinary(token, fileBlob) {
-  const formData = new FormData();
-  formData.append("file", fileBlob, "generated-art.png");
+export async function fetchAPI(endpoint, method, token, body) {
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
 
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/upload/cloudinary`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData
-  });
+  const options = {
+    method,
+    headers,
+  };
 
-  if (!res.ok) {
-    const errorData = await res.json();
-    throw new Error(errorData.error || 'Cloudinary upload failed.');
+  if (body) {
+    options.body = JSON.stringify(body);
   }
 
-  return await res.json();
+  const response = await fetch(`${BASE_URL}${endpoint}`, options);
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || `API request failed with status ${response.status}`);
+  }
+
+  return response.json();
 }
 
 /**
- * Calls the backend to mint an NFT with the provided metadata and media URL.
- *
- * @param {string} token - The user's JWT for authentication.
- * @param {string} title - The title of the NFT.
- * @param {string} description - The description of the NFT.
- * @param {string} mediaUrl - The URL of the media hosted on Cloudinary.
- * @returns {Promise<any>} A promise that resolves with the JSON response from the server.
+ * Calls the backend to initiate the minting process.
+ * @param {string} token - The user's JWT.
+ * @param {string} title - The NFT title.
+ * @param {string} description - The NFT description.
+ * @param {string} mediaUrl - The Cloudinary URL of the AI-generated image.
+ * @returns {Promise<{txId: string}>}
  */
-export async function mintNFT(token, title, description, mediaUrl) {
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/nft/mint`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ title, description, mediaUrl }),
-  });
+export const mintNFT = (token, title, description, mediaUrl) =>
+  fetchAPI('/api/nft/mint', 'POST', token, { title, description, mediaUrl });
 
-  return await res.json();
-}
+/**
+ * Broadcasts a signed transaction to list an NFT.
+ * @param {string} token - The user's JWT.
+ * @param {string} signedTx - The hex-encoded signed transaction.
+ * @returns {Promise<{success: boolean, txId: string}>}
+ */
+export const listNFT = (token, signedTx) =>
+  fetchAPI('/api/marketplace/list', 'POST', token, { signedTx });
+
+/**
+ * Broadcasts a signed transaction to buy an NFT.
+ * @param {string} token - The user's JWT.
+ * @param {string} signedTx - The hex-encoded signed transaction.
+ * @returns {Promise<{success: boolean, txId: string}>}
+ */
+export const buyNFT = (token, signedTx) =>
+  fetchAPI('/api/marketplace/buy', 'POST', token, { signedTx });
+
+/**
+ * Fetches all NFTs from the backend database.
+ * @returns {Promise<Array<object>>}
+ */
+export const getNFTs = () => fetch(`${BASE_URL}/api/nfts`).then(res => res.json());
+
+/**
+ * Fetches a single NFT's details.
+ * @param {string} tokenId - The ID of the token.
+ * @returns {Promise<object>}
+ */
+export const getNFT = (tokenId) => fetch(`${BASE_URL}/api/nft/${tokenId}`).then(res => res.json());
