@@ -1,0 +1,5 @@
+[testnet]
+name = "testnet"
+
+[accounts]
+deployer = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"

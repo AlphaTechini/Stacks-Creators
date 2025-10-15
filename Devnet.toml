@@ -1,0 +1,17 @@
+[devnet]
+name = "devnet"
+
+[accounts]
+deployer = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"
+
+[accounts.wallet_1]
+mnemonic = "observe february bounce scrap basic ticket stone logic crowd hospital check welcome"
+
+[accounts.wallet_2]
+mnemonic = "race draft tumble pouch get fabric steel derive resist zero judge comic"
+
+[accounts.wallet_3]
+mnemonic = "gift vague struggle mystery diamond scheme puzzle polar canvas brief depart balance"
+
+[accounts.wallet_4]
+mnemonic = "involve until issue stone comfort desk child fade toy inherit angle abstract"
