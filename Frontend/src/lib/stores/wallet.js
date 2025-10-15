@@ -11,11 +11,6 @@ function createWalletStore() {
     token: null,
     isLoading: true, // Start in loading state until checked
   });
-const walletState = $state({
-  stxAddress: null,
-  token: null,
-  isLoading: true, // Start in loading state until checked
-});
 
   // This function should be called once in the root layout.
   function initialize() {
@@ -45,23 +40,8 @@ const walletState = $state({
       }
     });
   }
-function set(newState) {
-  walletState.stxAddress = newState.stxAddress;
-  walletState.token = newState.token;
-  walletState.isLoading = newState.isLoading;
-}
 
   return { subscribe, set, update, initialize };
-function update(updater) {
-  const updatedState = updater(walletState);
-  set(updatedState);
 }
 
 export const wallet = createWalletStore();
-export const wallet = {
-  get stxAddress() { return walletState.stxAddress },
-  get token() { return walletState.token },
-  get isLoading() { return walletState.isLoading },
-  set,
-  update,
-};
