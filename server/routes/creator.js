@@ -98,15 +98,53 @@ export default async function creatorRoutes(fastify, options) {
   });
 
   /**
-   * POST /api/creator/fetch - Fetches user profile content from IPFS.
-   *
-   * Input: { walletAddress: string }
-   * Returns: { walletAddress, username, content }
+   * Route to get the currently authenticated user's profile.
    */
-  fastify.post('/api/creator/fetch', async (request, reply) => {
-    const { walletAddress } = request.body;
-    if (!walletAddress) {
-      return reply.code(400).send({ error: 'walletAddress is required.' });
+  fastify.get('/api/creator/me', { preHandler: [requireAuth] }, async (request, reply) => {
+    const address = request.user.sub;
+    const profile = await UserProfile.findOne({ address });
+
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found.' });
+    }
+    return profile;
+  });
+
+  /**
+   * Route to get a public creator profile by their wallet address.
+   */
+  fastify.get('/api/creator/:username', async (request, reply) => {
+    const { username } = request.params;
+    const profile = await UserProfile.findOne({ username });
+
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found for the given username.' });
+    }
+    return profile;
+  });
+
+  /**
+   * Route to partially update the authenticated user's profile.
+   * Payload: { bio, avatar, socials }
+   */
+  fastify.patch('/api/creator/update', { preHandler: [requireAuth] }, async (request, reply) => {
+    const address = request.user.sub;
+    const updates = {};
+
+    // Only include fields that are present in the request body
+    if (request.body.bio !== undefined) updates.bio = request.body.bio;
+    if (request.body.avatar !== undefined) updates.avatar = request.body.avatar;
+    if (request.body.socials !== undefined) {
+      // Allow partial updates to socials
+      updates['socials.twitter'] = request.body.socials.twitter;
+      updates['socials.instagram'] = request.body.socials.instagram;
+      updates['socials.facebook'] = request.body.socials.facebook;
+      updates['socials.tiktok'] = request.body.socials.tiktok;
+      updates['socials.youtube'] = request.body.socials.youtube;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return reply.code(400).send({ error: 'No fields to update were provided.' });
     }
 
     const user = await UserProfile.findOne({ address: walletAddress });

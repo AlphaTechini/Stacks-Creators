@@ -20,7 +20,10 @@ const userProfileSchema = new Schema(
     avatar: { type: String, default: '' }, // URL to the avatar image
     socials: {
       twitter: { type: String, default: '' },
-      github: { type: String, default: '' },
+      instagram: { type: String, default: '' },
+      facebook: { type: String, default: '' },
+      tiktok: { type: String, default: '' },
+      youtube: { type: String, default: '' },
     },
   },
   { timestamps: true } // Adds createdAt and updatedAt fields automatically

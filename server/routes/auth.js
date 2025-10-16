@@ -66,7 +66,7 @@ export default async function authRoutes(fastify, options) {
       signature,
       publicKey,
       address,
-      network: process.env.STACKS_NETWORK || 'mainnet',
+      network: process.env.STACKS_NETWORK || 'testnet',
     });
 
     if (!isSignatureValid) {
