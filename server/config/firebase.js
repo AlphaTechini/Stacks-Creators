@@ -1,6 +1,6 @@
 // 1. Import Firebase app and Firestore
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc } from "firebase/firestore";
 
 // 2. Firebase config
 const firebaseConfig = {
@@ -19,4 +19,4 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // 5. Export Firestore and functions to use in backend routes
-export { db, collection, doc, getDoc, setDoc, updateDoc };
+export { db, collection, doc, getDoc, getDocs, setDoc, updateDoc };

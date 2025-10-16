@@ -1,7 +1,7 @@
 <script>
 	import '../app.css';
-	import favicon from '$lib/assets/favicon.svg';
 	import { writable } from 'svelte/store';
+	import { browser } from '$app/environment';
 	import { wallet } from '$lib/stores/wallet.js';
 	import { handleLogin, handleLogout } from '$lib/stacksClient.js';
 
@@ -12,34 +12,38 @@
 
 	// Svelte 5: Initialize wallet store from localStorage
 	$effect.pre(() => {
-		const storedToken = localStorage.getItem('stacks_token');
-		if (storedToken) {
-			try {
-				const payload = JSON.parse(atob(storedToken.split('.')[1]));
-				if (payload.exp * 1000 > Date.now()) {
-					wallet.set({ stxAddress: payload.sub, token: storedToken, isLoading: false });
-				} else {
-					handleLogout(); // Token expired
+		if (browser) {
+			const storedToken = localStorage.getItem('stacks_token');
+			if (storedToken) {
+				try {
+					const payload = JSON.parse(atob(storedToken.split('.')[1]));
+					if (payload.exp * 1000 > Date.now()) {
+						wallet.set({ stxAddress: payload.sub, token: storedToken, isLoading: false });
+					} else {
+						handleLogout(); // Token expired
+					}
+				} catch (e) {
+					handleLogout(); // Invalid token
 				}
-			} catch (e) {
-				handleLogout(); // Invalid token
+			} else {
+				wallet.set({ stxAddress: null, token: null, isLoading: false });
 			}
-		} else {
-			wallet.set({ stxAddress: null, token: null, isLoading: false });
 		}
 	});
 
 	// This is a Svelte 4 onMount equivalent for the theme store.
 	// In Svelte 5, you might handle this differently, but this works.
 	$effect(() => {
-		const storedTheme = localStorage.getItem('theme');
-		if (storedTheme && (storedTheme === 'light' || storedTheme === 'dark')) {
-			theme.set(storedTheme);
+		if (browser) {
+			const storedTheme = localStorage.getItem('theme');
+			if (storedTheme && (storedTheme === 'light' || storedTheme === 'dark')) {
+				theme.set(storedTheme);
+			}
 		}
 
 		// Apply theme to the document
 		theme.subscribe((value) => {
-			if (typeof document !== 'undefined') {
+			if (browser) {
 				document.documentElement.setAttribute('data-theme', value);
 				localStorage.setItem('theme', value);
 			}
@@ -52,7 +56,6 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 	<link
@@ -87,7 +90,7 @@
 </header>
 
 <main>
-	{@render children?.()}
+	{@render children()}
 </main>
 
 <style>

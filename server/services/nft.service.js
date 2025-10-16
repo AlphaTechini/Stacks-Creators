@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
-import {
+import StacksTransactions from '@stacks/transactions';
+const {
   uintCV,
   makeContractCall,
   createStacksPrivateKey,
@@ -9,7 +10,7 @@ import {
   TransactionSigner,
   callReadOnlyFunction,
   cvToJSON,
-} from '@stacks/transactions';
+} = StacksTransactions;
 import { network, broadcastTransaction } from '../utils/stacksClient.js';
 
 // A simple in-memory lock to prevent race conditions during minting.
@@ -68,7 +69,7 @@ export async function mintNFT(creatorAddress, title, description, aiImageBuffer)
     network,
   });
   const lastTokenId = cvToJSON(nextTokenIdResult).value;
-  const tokenId = cvToJSON(nextTokenIdResult).value === null ? 0 : Number(lastTokenId) + 1;
+  const tokenId = lastTokenId === null ? 0 : Number(lastTokenId) + 1;
 
   // STEP 2: Upload media and metadata to Cloudinary using the correct tokenId.
   const { secure_url: mediaUrl } = await uploadToCloudinary(aiImageBuffer, 'nfts/media', tokenId.toString());

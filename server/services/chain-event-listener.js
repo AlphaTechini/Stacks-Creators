@@ -1,6 +1,7 @@
 import { connectWebSocketClient } from '@stacks/blockchain-api-client';
 import { db, doc, getDoc, setDoc, updateDoc } from '../config/firebase.js';
-import { callReadOnlyFunction, cvToJSON, uintCV } from '@stacks/transactions';
+import StacksTransactions from '@stacks/transactions';
+const { callReadOnlyFunction, cvToJSON, uintCV } = StacksTransactions;
 
 const API_URL = process.env.STACKS_API_URL || 'https://api.testnet.hiro.so';
 
@@ -89,14 +90,6 @@ export async function startEventListener() {
       const client = await connectWebSocketClient(API_URL);
       retryCount = 0; // Reset on successful connection
       console.log('[Chain-Listener] Successfully connected to WebSocket.');
-
-      await client.subscribeNftEvents(async (event) => {
-        if (event.asset_event_type === 'mint') {
-          // This is a generic mint event. We'll rely on our custom `print` events.
-        } else if (event.asset_event_type === 'transfer') {
-          // This is a generic transfer event.
-        }
-      });
 
       // Listen for our custom `print` events
       client.socket.on('print', (event) => {

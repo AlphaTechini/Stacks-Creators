@@ -1,6 +1,14 @@
 <script>
   import { wallet } from '$lib/stores/wallet.js';
   import { handleLogin, handleLogout } from '$lib/stacksClient.js';
+
+  function onLogin(walletType) {
+    handleLogin(walletType);
+  }
+
+  function onLogout() {
+    handleLogout();
+  }
 </script>
 
 <section class="hero">
@@ -25,14 +33,14 @@
         <code class="address-code">{$wallet.stxAddress}</code>
         <div class="button-group">
           <a href="/setup-profile" class="primary">Setup Profile</a>
-          <button class="secondary" onclick={handleLogout}>Logout</button>
+          <button class="secondary" onclick={onLogout}>Logout</button>
         </div>
       </div>
     {:else}
       <p>Connect your Stacks wallet to get started.</p>
       <div class="button-group">
-        <button class="primary" onclick={() => handleLogin('leather')}>Connect Leather</button>
-        <button class="secondary" onclick={() => handleLogin('xverse')}>Connect Xverse</button>
+        <button class="primary" onclick={() => onLogin('leather')}>Connect Leather</button>
+        <button class="secondary" onclick={() => onLogin('xverse')}>Connect Xverse</button>
       </div>
     {/if}
 

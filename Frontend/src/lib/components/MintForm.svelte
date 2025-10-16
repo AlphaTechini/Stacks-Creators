@@ -7,7 +7,7 @@
   let title = $state('');
   let description = $state('');
   let file = $state(null);
-  let originalFilePreview = $state('');
+  let originalFilePreview = $state.raw('');
 
   let isMinting = $state(false);
   let progress = $state('');

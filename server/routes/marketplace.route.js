@@ -1,6 +1,7 @@
 import { db, doc, getDoc, getDocs, collection, updateDoc } from '../config/firebase.js';
 import { broadcastTransaction } from '../utils/stacksClient.js';
-import { Transaction, deserializeTransaction } from '@stacks/transactions';
+import StacksTransactions from '@stacks/transactions';
+const { deserializeTransaction } = StacksTransactions;
 
 /**
  * Fastify plugin for NFT marketplace interactions.

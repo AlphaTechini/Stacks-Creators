@@ -1,15 +1,15 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
+import { startEventListener } from './services/chain-event-listener.js';
 import { verifyToken } from './utils/jwt.js';
 
 // Route Imports
-import userRoutes from './routes/user.route.js';
+import userRoutes from './routes/users.js';
 import creatorRoutes from './routes/creator.js';
 import mintRoute from './routes/mint.route.js';
 import uploadRoutes from './routes/upload.route.js';
 import marketplaceRoutes from './routes/marketplace.route.js';
-import aiRoutes from './routes/ai.route.js';
 
 // Initialize Fastify
 const fastify = Fastify({
@@ -52,7 +52,9 @@ fastify.register(creatorRoutes);
 fastify.register(mintRoute);
 fastify.register(marketplaceRoutes);
 fastify.register(uploadRoutes);
-fastify.register(aiRoutes);
+
+// Start listening for on-chain events
+startEventListener();
 
 // Start the server
 const start = async () => {
