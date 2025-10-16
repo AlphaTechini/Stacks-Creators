@@ -91,7 +91,10 @@ export default async function creatorRoutes(fastify, options) {
     if (request.body.socials !== undefined) {
       // Allow partial updates to socials
       updates['socials.twitter'] = request.body.socials.twitter;
-      updates['socials.github'] = request.body.socials.github;
+      updates['socials.instagram'] = request.body.socials.instagram;
+      updates['socials.facebook'] = request.body.socials.facebook;
+      updates['socials.tiktok'] = request.body.socials.tiktok;
+      updates['socials.youtube'] = request.body.socials.youtube;
     }
 
     if (Object.keys(updates).length === 0) {
