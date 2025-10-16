@@ -1,48 +1,34 @@
 <script>
-  import { wallet } from '$lib/stores/wallet.js';
-  import { handleLogin, handleLogout } from '$lib/stacksClient.js';
+	import { wallet } from '$lib/stores/wallet.js';
+	import { handleLogin, handleLogout } from '$lib/stacksClient.js';
 
-  function onLogin(walletType) {
-    handleLogin(walletType);
-  }
+	function onLogin(walletType) {
+		handleLogin(walletType);
+	}
 
-  function onLogout() {
-    handleLogout();
-  }
+	function onLogout() {
+		handleLogout();
+	}
 </script>
 
-<section class="hero">
-  <div>
-    <h1>Stacks Creators</h1>
-    <p class="lead">
-      Transform your photos into AI-animated avatars, mint them as NFTs, and sell them directly to
-      your fans.
-    </p>
-  </div>
-</section>
-
-<section class="onboard-card">
-  <div class="container">
-    <h2>Onboarding</h2>
-
-    {#if $wallet.isLoading}
-      <p>Connecting to wallet and verifying...</p>
-    {:else if $wallet.stxAddress}
-      <div class="success-message">
-        <p>✅ Connected as:</p>
-        <code class="address-code">{$wallet.stxAddress}</code>
-        <div class="button-group">
-          <a href="/setup-profile" class="primary">Setup Profile</a>
-          <button class="secondary" onclick={onLogout}>Logout</button>
-        </div>
-      </div>
-    {:else}
-      <p>Connect your Stacks wallet to get started.</p>
-      <div class="button-group">
-        <button class="primary" onclick={() => onLogin('leather')}>Connect Leather</button>
-        <button class="secondary" onclick={() => onLogin('xverse')}>Connect Xverse</button>
-      </div>
-    {/if}
+{#if $wallet.isLoading}
+	<p>Connecting to wallet and verifying...</p>
+{:else if $wallet.stxAddress}
+	<div class="success-message">
+		<p>✅ Connected as:</p>
+		<code class="address-code">{$wallet.stxAddress}</code>
+		<div class="button-group">
+			<a href="/setup-profile" class="primary">Setup Profile</a>
+			<button class="secondary" onclick={onLogout}>Logout</button>
+		</div>
+	</div>
+{:else}
+	<p>Connect your Stacks wallet to get started.</p>
+	<div class="button-group">
+		<button class="primary" onclick={() => onLogin('leather')}>Connect Leather</button>
+		<button class="secondary" onclick={() => onLogin('xverse')}>Connect Xverse</button>
+	</div>
+{/if}
 
   </div>
 </section>
