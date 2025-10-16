@@ -1,30 +1,18 @@
-import { $state } from 'svelte/reactivity';
+// src/lib/stores/wallet.js
+import { writable } from 'svelte/store';
 
-/**
- * A custom Svelte store to manage the user's wallet session.
- * It handles loading the session from localStorage on startup.
- */
-const walletState = $state({
-  stxAddress: null,
-  token: null,
-  isLoading: true, // Start in loading state until checked
-});
+function createWalletStore() {
+	const { subscribe, set, update } = writable({
+		stxAddress: null,
+		token: null,
+		isLoading: true,
+	});
 
-function set(newState) {
-  walletState.stxAddress = newState.stxAddress;
-  walletState.token = newState.token;
-  walletState.isLoading = newState.isLoading;
+	return {
+		subscribe,
+		set: (newState) => set(newState),
+		update: (updater) => update(updater),
+	};
 }
 
-function update(updater) {
-  const updatedState = updater(walletState);
-  set(updatedState);
-}
-
-export const wallet = {
-  get stxAddress() { return walletState.stxAddress },
-  get token() { return walletState.token },
-  get isLoading() { return walletState.isLoading },
-  set,
-  update,
-};
+export const wallet = createWalletStore();
