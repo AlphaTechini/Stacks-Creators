@@ -67,12 +67,12 @@ export default async function creatorRoutes(fastify, options) {
   /**
    * Route to get a public creator profile by their wallet address.
    */
-  fastify.get('/api/creator/:address', async (request, reply) => {
-    const { address } = request.params;
-    const profile = await UserProfile.findOne({ address });
+  fastify.get('/api/creator/:username', async (request, reply) => {
+    const { username } = request.params;
+    const profile = await UserProfile.findOne({ username });
 
     if (!profile) {
-      return reply.code(404).send({ error: 'Profile not found for the given address.' });
+      return reply.code(404).send({ error: 'Profile not found for the given username.' });
     }
     return profile;
   });
