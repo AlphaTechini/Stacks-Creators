@@ -1,5 +1,5 @@
 import { connectWebSocketClient } from '@stacks/blockchain-api-client';
-import { NFTItem } from '../models/NFTItem.js';
+import { db, doc, getDoc, setDoc, updateDoc } from '../config/firebase.js';
 import { callReadOnlyFunction, cvToJSON, uintCV } from '@stacks/transactions';
 
 const API_URL = process.env.STACKS_API_URL || 'https://api.testnet.hiro.so';
@@ -15,9 +15,11 @@ async function handleMintEvent(event) {
   const recipient = event.recipient.value;
   console.log(`[Chain-Listener] Detected Mint: Token ID ${tokenId} to ${recipient}`);
 
+  const nftRef = doc(db, 'nfts', tokenId.toString());
+
   // Check if we've already processed this mint to avoid duplicates.
-  const existingNft = await NFTItem.findOne({ tokenId });
-  if (existingNft) {
+  const nftDoc = await getDoc(nftRef);
+  if (nftDoc.exists()) {
     console.log(`[Chain-Listener] Mint for NFT ${tokenId} already processed.`);
     return;
   }
@@ -28,23 +30,23 @@ async function handleMintEvent(event) {
     contractName: process.env.STACKS_CONTRACT_NAME_CREATOR,
     functionName: 'get-token-uri',
     functionArgs: [uintCV(tokenId)],
-    network,
     senderAddress: process.env.STACKS_SENDER_ADDRESS,
   });
 
   const metadataUrl = cvToJSON(uriResult).value.value;
   const metadata = await fetch(metadataUrl).then(res => res.json());
 
-  // Create the new NFT record in our database
-  const newNft = new NFTItem({
+  const newNftData = {
     tokenId,
     creatorAddress: recipient, // The first owner is the creator
     ownerAddress: recipient,
     imageUrl: metadata.image,
     aiImageUrl: metadata.image, // The `metadata.image` field contains the URL of the final AI-generated image.
     txId: event.tx_id,
-  });
-  await newNft.save();
+    listed: false, // NFTs are not listed by default on mint
+    createdAt: new Date().toISOString(),
+  };
+  await setDoc(nftRef, newNftData);
   console.log(`[Chain-Listener] New NFT ${tokenId} saved to database.`);
 }
 
@@ -59,18 +61,16 @@ async function handlePurchaseEvent(event) {
   const buyer = event.buyer.value;
   console.log(`[Chain-Listener] Detected Purchase: Token ID ${tokenId} bought by ${buyer}`);
 
-  const nft = await NFTItem.findOne({ tokenId });
+  const nftRef = doc(db, 'nfts', tokenId.toString());
+  const nftDoc = await getDoc(nftRef);
 
-  if (!nft) {
-    console.error(`[Chain-Listener] Purchased NFT ${token_id} not found in DB.`);
+  if (!nftDoc.exists()) {
+    console.error(`[Chain-Listener] Purchased NFT ${tokenId} not found in DB.`);
     return;
   }
 
   // Update the owner and listed status based on the confirmed on-chain event
-  nft.ownerAddress = buyer;
-  nft.listed = false;
-  // You might also want to record the sale price and date in a separate 'sales' collection.
-  await nft.save();
+  await updateDoc(nftRef, { ownerAddress: buyer, listed: false });
 
   console.log(`[Chain-Listener] DB updated for NFT ${tokenId}. New owner: ${buyer}`);
 }

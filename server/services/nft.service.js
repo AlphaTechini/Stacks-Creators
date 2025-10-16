@@ -1,15 +1,19 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { v4 as uuidv4 } from 'uuid';
 import {
+  uintCV,
   makeContractCall,
   createStacksPrivateKey,
   standardPrincipalCV,
   AnchorMode,
   stringUtf8CV,
   TransactionSigner,
+  callReadOnlyFunction,
+  cvToJSON,
 } from '@stacks/transactions';
 import { network, broadcastTransaction } from '../utils/stacksClient.js';
-import { NFTItem } from '../models/NFTItem.js';
+
+// A simple in-memory lock to prevent race conditions during minting.
+let isMinting = false;
 
 // Configure Cloudinary SDK
 cloudinary.config({
@@ -47,29 +51,42 @@ function uploadToCloudinary(buffer, folder, public_id) {
  * @returns {Promise<{txId: string, mediaUrl: string}>}
  */
 export async function mintNFT(creatorAddress, title, description, aiImageBuffer) {
-  const tokenId = uuidv4(); // Generate a unique ID for the asset
+  if (isMinting) {
+    throw new Error('Another minting process is already in progress. Please try again in a moment.');
+  }
+  isMinting = true;
 
-  // 1. Upload the final AI-generated image to Cloudinary
-  const { secure_url: mediaUrl } = await uploadToCloudinary(aiImageBuffer, 'nfts/media', tokenId);
+  try {
+  // STEP 1: Get the next available token ID directly from the smart contract.
+  // This is the single source of truth for the NFT's ID.
+  const nextTokenIdResult = await callReadOnlyFunction({
+    contractAddress: process.env.STACKS_CONTRACT_ADDRESS,
+    contractName: process.env.STACKS_CONTRACT_NAME_CREATOR,
+    functionName: 'get-last-token-id', // Assuming the contract has a `(define-read-only (get-last-token-id) ...)`
+    functionArgs: [],
+    senderAddress: process.env.STACKS_SENDER_ADDRESS,
+    network,
+  });
+  const lastTokenId = cvToJSON(nextTokenIdResult).value;
+  const tokenId = cvToJSON(nextTokenIdResult).value === null ? 0 : Number(lastTokenId) + 1;
+
+  // STEP 2: Upload media and metadata to Cloudinary using the correct tokenId.
+  const { secure_url: mediaUrl } = await uploadToCloudinary(aiImageBuffer, 'nfts/media', tokenId.toString());
+  const { nonce } = await fetch(
+    `${network.coreApiUrl}/v2/accounts/${process.env.STACKS_SENDER_ADDRESS}`,
+  ).then(res => res.json());
 
   // 2. Create and upload metadata JSON to Cloudinary
   const metadata = { title, description, image: mediaUrl };
   const metadataBuffer = Buffer.from(JSON.stringify(metadata));
-  const { secure_url: metadataUrl } = await uploadToCloudinary(metadataBuffer, 'nfts/metadata', tokenId);
+  const { secure_url: metadataUrl } = await uploadToCloudinary(metadataBuffer, 'nfts/metadata', tokenId.toString());
   if (!metadataUrl) {
     throw new Error('Failed to upload metadata file to Cloudinary.');
   }
 
-  // 3. Build and sign the Stacks transaction
+  // STEP 3: Build, sign, and broadcast the Stacks transaction.
   const senderKey = process.env.STACKS_PRIVATE_KEY;
   const privateKey = createStacksPrivateKey(process.env.STACKS_PRIVATE_KEY);
-
-  // Fetch the current nonce for the SERVER'S sender account to prevent transaction failures.
-  // This is the account that pays the transaction fees for the mint.
-  const { nonce } = await fetch(
-    // Note: Using a template literal to ensure the URL is correct.
-    `${network.coreApiUrl}/v2/accounts/${process.env.STACKS_SENDER_ADDRESS}`,
-  ).then(res => res.json());
 
   const txOptions = {
     contractAddress: process.env.STACKS_CONTRACT_ADDRESS,
@@ -92,4 +109,7 @@ export async function mintNFT(creatorAddress, title, description, aiImageBuffer)
 
   // Return only the transaction ID. The listener will handle the DB write.
   return { txId, mediaUrl };
+  } finally {
+    isMinting = false; // Release the lock
+  }
 }

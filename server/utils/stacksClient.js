@@ -1,12 +1,22 @@
-import { StacksMainnet, StacksTestnet } from '@stacks/network';
+import { StacksTestnet, StacksDevnet } from '@stacks/network';
 import { broadcastTransaction as broadcast } from '@stacks/transactions';
 
 /**
  * Configures and exports a Stacks network client based on the environment.
- * Defaults to 'testnet' if STACKS_NETWORK is not 'mainnet'.
+ * Defaults to 'testnet' if STACKS_NETWORK is not 'devnet'.
+ * It explicitly prevents configuration for 'mainnet'.
  */
-export const network =
-  process.env.STACKS_NETWORK === 'mainnet' ? new StacksMainnet() : new StacksTestnet();
+function getNetwork() {
+  const networkEnv = process.env.STACKS_NETWORK;
+  if (networkEnv === 'mainnet') {
+    throw new Error("This application is configured for testnet/devnet only. Do not use on mainnet.");
+  }
+  if (networkEnv === 'devnet') {
+    return new StacksDevnet();
+  }
+  return new StacksTestnet();
+}
+export const network = getNetwork();
 
 console.log(`Stacks client configured for: ${network.isMainnet() ? 'Mainnet' : 'Testnet'}`);
 

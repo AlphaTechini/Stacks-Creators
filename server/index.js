@@ -1,7 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
-import { connectDB } from './config/db.js';
 import { verifyToken } from './utils/jwt.js';
 
 // Route Imports
@@ -9,6 +8,7 @@ import userRoutes from './routes/user.route.js';
 import creatorRoutes from './routes/creator.js';
 import mintRoute from './routes/mint.route.js';
 import uploadRoutes from './routes/upload.route.js';
+import marketplaceRoutes from './routes/marketplace.route.js';
 import aiRoutes from './routes/ai.route.js';
 
 // Initialize Fastify
@@ -25,9 +25,6 @@ fastify.register(cors, {
 fastify.register(multipart, {
   // We can add limits here if needed, e.g., fileSize
 });
-
-// Connect to Database
-connectDB();
 
 /**
  * A pre-handler hook to verify the JWT from the Authorization header.
@@ -53,6 +50,7 @@ fastify.decorate('requireAuth', authHook);
 fastify.register(userRoutes);
 fastify.register(creatorRoutes);
 fastify.register(mintRoute);
+fastify.register(marketplaceRoutes);
 fastify.register(uploadRoutes);
 fastify.register(aiRoutes);
 

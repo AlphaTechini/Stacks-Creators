@@ -1,4 +1,4 @@
-import { UserProfile } from '../models/UserProfile.js';
+import { db, doc, getDoc, setDoc } from '../config/firebase.js';
 import { createHelia } from 'helia';
 import { unixfs } from '@helia/unixfs';
 import { CID } from 'multiformats/cid';
@@ -8,9 +8,9 @@ const helia = await createHelia();
 const fs = unixfs(helia);
 
 // Helper to get content from IPFS
-async function getFromIPFS(cidString) {
+async function getFromIPFS(cid) {
   let data = '';
-  for await (const chunk of fs.cat(CID.parse(cidString))) {
+  for await (const chunk of fs.cat(CID.parse(cid))) {
     data += new TextDecoder().decode(chunk);
   }
   return data;
@@ -23,61 +23,63 @@ async function getFromIPFS(cidString) {
  */
 export default async function creatorRoutes(fastify, options) {
   /**
-   * POST /api/creator/sync - Creates or updates a creator's profile.
+   * POST /api/creator/sync - Syncs user profile data. Content goes to IPFS, metadata to Firestore.
    * Creates a profile if one doesn't exist, otherwise updates it.
    * The wallet address is the primary key, derived from the auth token.
    *
-   * Input: { username?, bio?, avatar?, socials?, content? }
+   * @body {{ content?: object, username?: string }}
+   *   - `content`: The JSON object for the user's profile. Can contain any data, including a `socials` object like:
+   *     `{ "socials": { "twitter": "...", "instagram": "...", "facebook": "...", "tiktok": "...", "youtube": "..." } }`
    *   - `username`: An optional display name.
-   *   - `bio`, `avatar`, `socials`: Other profile fields to store in the database.
-   *   - `content`: Larger content (e.g., a JSON object) to store on IPFS.
    *
-   * Returns: The updated user profile document.
+   * @returns {Promise<{ walletAddress: string, cid: string|null, username: string|null }>} The updated user profile metadata.
    */
   fastify.post('/api/creator/sync', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
-    const { username, bio, avatar, socials, content } = request.body;
+    const { content, username } = request.body;
     const walletAddress = request.user.sub;
 
     try {
-      const updates = {};
-      if (username !== undefined) updates.username = username;
-      if (bio !== undefined) updates.bio = bio;
-      if (avatar !== undefined) updates.avatar = avatar;
-      if (socials) {
-        // Use dot notation for robust partial updates of the nested socials object.
-        Object.keys(socials).forEach(key => {
-          updates[`socials.${key}`] = socials[key];
-        });
-      }
+      const userRef = doc(db, 'users', walletAddress);
+      const docSnap = await getDoc(userRef);
+      const user = docSnap.exists() ? docSnap.data() : null;
+      let newCid = user?.cid || null;
 
-      // If new `content` is provided, upload it to IPFS and add the CID to the updates.
+      // If new content is provided, upload it to IPFS to get a new CID.
       if (content) {
         const contentBuffer = Buffer.from(typeof content === 'object' ? JSON.stringify(content) : content);
-        const { cid } = await fs.addBytes(contentBuffer);
-        updates.cid = cid.toString();
+        const ipfsCid = await fs.addBytes(contentBuffer);
+        newCid = ipfsCid.toString();
       }
 
-      const profile = await UserProfile.findOneAndUpdate(
-        { address: walletAddress },
-        { $set: updates },
-        { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-      );
+      // Prepare the metadata for Firestore.
+      const profileData = {
+        walletAddress: walletAddress,
+        username: username !== undefined ? username : (user?.username || null),
+        cid: newCid
+      };
 
-      return profile;
-    } catch (error) {
-      if (error.code === 11000) {
-        return reply.code(409).send({ error: 'Username is already taken.' });
-      }
+      // Use `set` with `merge: true` to create or update the document in Firestore.
+      // This ensures we don't overwrite fields that aren't provided in the request.
+      await setDoc(userRef, profileData, { merge: true });
+
+      const response = {
+        walletAddress: profileData.walletAddress,
+        username: profileData.username,
+        cid: profileData.cid,
+      };
+
+      return reply.code(user ? 200 : 201).send(response);
+    } catch (error) { // eslint-disable-line no-unused-vars
       fastify.log.error(error, 'Error syncing creator profile');
       return reply.code(500).send({ error: 'An error occurred during profile sync.' });
     }
   });
 
   /**
-   * POST /api/creator/fetch - Fetches a user's profile and their IPFS content.
+   * POST /api/creator/fetch - Fetches user profile metadata from Firestore and content from IPFS.
    *
    * Input: { walletAddress: string }
-   * Returns: The user profile document from DB, with an added `content` field from IPFS.
+   * @returns {Promise<{ walletAddress: string, username: string|null, content: object|string|null }>} The user profile.
    */
   fastify.post('/api/creator/fetch', async (request, reply) => {
     const { walletAddress } = request.body;
@@ -85,17 +87,22 @@ export default async function creatorRoutes(fastify, options) {
       return reply.code(400).send({ error: 'walletAddress is required.' });
     }
 
-    const user = await UserProfile.findOne({ address: walletAddress });
-    if (!user) {
+    const userRef = doc(db, 'users', walletAddress);
+    const docSnap = await getDoc(userRef);
+
+    if (!docSnap.exists()) {
       return reply.code(404).send({ error: 'User not found.' });
     }
 
-    const profile = user.toObject();
-    let ipfsContent = null;
+    const user = docSnap.data();
 
-    if (profile.cid) {
-      ipfsContent = await getFromIPFS(profile.cid);
+    if (!user.cid) {
+      // User exists but has no IPFS content yet.
+      return { walletAddress, username: user.username, content: null };
     }
-    return { ...profile, content: ipfsContent };
+
+    const content = await getFromIPFS(user.cid);
+    // The content from IPFS is a JSON string, so we parse it.
+    return { walletAddress, username: user.username, content: JSON.parse(content) };
   });
 }
