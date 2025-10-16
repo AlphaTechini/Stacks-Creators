@@ -108,32 +108,19 @@ export function handleLogout() {
  * @returns {Promise<string>} The hex-encoded signed transaction.
  */
 export async function createListTx(tokenId, price) {
-  const txOptions = {
-    contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS,
-    contractName: import.meta.env.VITE_MARKETPLACE_CONTRACT_NAME,
-    functionName: 'list-token',
-    functionArgs: [uintCV(tokenId), uintCV(price)],
-    appDetails: {
-      name: 'Stacks Creators',
-      icon: window.location.origin + '/logo.svg',
-    },
-    onFinish: data => {
-      // This callback gives us the signed transaction without broadcasting
-      return data.stacksTransaction.serialize().toString('hex');
-    },
-    onCancel: () => {
-      throw new Error('Transaction signing was cancelled.');
-    },
-  };
-  // We need to find a way to get the signed tx back from the promise.
-  // This is a known challenge with openContractCall. A common workaround is to
-  // use a temporary store or a promise resolver accessible in the onFinish scope.
-  // For now, we'll assume a simplified flow where we can await it.
-  // A more robust solution would use a dedicated transaction store.
   return new Promise((resolve, reject) => {
-    txOptions.onFinish = data => resolve(data.stacksTransaction.serialize().toString('hex'));
-    txOptions.onCancel = () => reject(new Error('Transaction signing was cancelled.'));
-    openContractCall(txOptions);
+    openContractCall({
+      contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS,
+      contractName: import.meta.env.VITE_STACKS_CONTRACT_NAME_MARKET,
+      functionName: 'list-token',
+      functionArgs: [uintCV(tokenId), uintCV(price)],
+      appDetails: {
+        name: 'Stacks Creators',
+        icon: window.location.origin + '/logo.svg',
+      },
+      onFinish: data => resolve(data.stacksTransaction.serialize().toString('hex')),
+      onCancel: () => reject(new Error('Transaction signing was cancelled.')),
+    });
   });
 }
 
@@ -141,18 +128,19 @@ export async function createListTx(tokenId, price) {
  * Creates and signs a `buy-token` transaction.
  * @param {number} tokenId - The ID of the token to buy.
  * @param {number} price - The price in micro-STX.
+ * @param {string} userAddress - The STX address of the user initiating the purchase.
  * @returns {Promise<string>} The hex-encoded signed transaction.
  */
-export async function createBuyTx(tokenId, price) {
+export async function createBuyTx(tokenId, price, userAddress) {
   return new Promise((resolve, reject) => {
     openContractCall({
       contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS,
-      contractName: import.meta.env.VITE_MARKETPLACE_CONTRACT_NAME,
+      contractName: import.meta.env.VITE_STACKS_CONTRACT_NAME_MARKET,
       functionName: 'buy-token',
       functionArgs: [uintCV(tokenId), uintCV(price)],
       postConditions: [
         createSTXPostCondition(
-          wallet.stxAddress, // The user's address
+          userAddress, // The user's address
           FungibleConditionCode.Equal,
           price
         ),

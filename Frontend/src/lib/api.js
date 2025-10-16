@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
 /**
  * A helper function for making authenticated API requests.
@@ -34,15 +34,35 @@ export async function fetchAPI(endpoint, method, token, body) {
 }
 
 /**
- * Calls the backend to initiate the minting process.
+ * Calls the backend to run the entire generation and minting pipeline.
  * @param {string} token - The user's JWT.
+ * @param {File} file - The original image file.
  * @param {string} title - The NFT title.
  * @param {string} description - The NFT description.
- * @param {string} mediaUrl - The Cloudinary URL of the AI-generated image.
- * @returns {Promise<{txId: string}>}
+ * @returns {Promise<{success: boolean, txId: string, mediaUrl: string}>}
  */
-export const mintNFT = (token, title, description, mediaUrl) =>
-  fetchAPI('/api/nft/mint', 'POST', token, { title, description, mediaUrl });
+export async function generateAndMintNFT(token, file, title, description) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('title', title);
+  formData.append('description', description);
+
+  const response = await fetch(`${BASE_URL}/api/nft/generate-and-mint`, {
+    method: 'POST',
+    headers: {
+      // 'Content-Type' is set automatically by the browser for FormData.
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || `API request failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
 
 /**
  * Broadcasts a signed transaction to list an NFT.

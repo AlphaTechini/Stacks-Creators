@@ -18,6 +18,10 @@ const userProfileSchema = new Schema(
     },
     bio: { type: String, default: '' },
     avatar: { type: String, default: '' }, // URL to the avatar image
+    cid: {
+      type: String, // IPFS CID of the user's profile content
+      default: null,
+    },
     socials: {
       twitter: { type: String, default: '' },
       instagram: { type: String, default: '' },

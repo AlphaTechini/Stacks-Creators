@@ -25,7 +25,7 @@ async function handleMintEvent(event) {
   // Fetch the metadata URI from the contract to get the Cloudinary URL
   const uriResult = await callReadOnlyFunction({
     contractAddress: process.env.STACKS_CONTRACT_ADDRESS,
-    contractName: process.env.STACKS_CONTRACT_NAME,
+    contractName: process.env.STACKS_CONTRACT_NAME_CREATOR,
     functionName: 'get-token-uri',
     functionArgs: [uintCV(tokenId)],
     network,
@@ -41,7 +41,7 @@ async function handleMintEvent(event) {
     creatorAddress: recipient, // The first owner is the creator
     ownerAddress: recipient,
     imageUrl: metadata.image,
-    aiImageUrl: metadata.image, // Assuming they are the same for now
+    aiImageUrl: metadata.image, // The `metadata.image` field contains the URL of the final AI-generated image.
     txId: event.tx_id,
   });
   await newNft.save();

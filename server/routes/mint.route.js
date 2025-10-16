@@ -1,18 +1,5 @@
-import { mintNFT } from '../../services/nft.service.js';
-
-const bodyJsonSchema = {
-  type: 'object',
-  required: ['title', 'description', 'mediaUrl'],
-  properties: {
-    title: { type: 'string', minLength: 1, maxLength: 100 },
-    description: { type: 'string', maxLength: 1000 },
-    mediaUrl: { type: 'string', format: 'uri' },
-  },
-};
-
-const schema = {
-  body: bodyJsonSchema,
-};
+import { mintNFT } from '../services/nft.service.js';
+import { transformImage } from '../services/ai.service.js';
 
 /**
  * Encapsulates the routes for NFT minting.
@@ -21,16 +8,33 @@ const schema = {
  */
 export default async function mintRoute(fastify, options) {
   /**
-   * POST /api/nft/mint - Requires authentication
-   * Accepts JSON body: { title, description, mediaUrl }
+   * POST /api/nft/generate-and-mint - Requires authentication
+   * This is a multi-step, single-endpoint process for creating an NFT.
+   * 1. Accepts an image file and metadata (multipart/form-data).
+   * 2. Transforms the image using the AI service.
+   * 3. Mints the NFT with the new AI image.
+   *
+   * Multipart Fields: { file, title, description }
    */
-  fastify.post('/api/nft/mint', { schema, preHandler: [fastify.requireAuth] }, async (request, reply) => {
-    const { title, description, mediaUrl } = request.body;
+  fastify.post('/api/nft/generate-and-mint', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
+    const data = await request.file();
+    if (!data) {
+      return reply.code(400).send({ success: false, error: 'Image file is required.' });
+    }
+
+    const title = data.fields.title?.value;
+    const description = data.fields.description?.value;
+    if (!title) {
+      return reply.code(400).send({ success: false, error: 'Title is a required field.' });
+    }
+
     const creatorAddress = request.user.sub; // Address from JWT payload
 
     try {
-      const result = await mintNFT(creatorAddress, title, description, mediaUrl);
-
+      const originalImageBuffer = await data.toBuffer();
+      const aiImageBlob = await transformImage(originalImageBuffer, description || title);
+      const aiImageBuffer = Buffer.from(await aiImageBlob.arrayBuffer());
+      const result = await mintNFT(creatorAddress, title, description, aiImageBuffer);
       return reply.code(201).send({ success: true, ...result });
     } catch (error) {
       fastify.log.error({ err: error, creatorAddress }, 'NFT Minting Error');

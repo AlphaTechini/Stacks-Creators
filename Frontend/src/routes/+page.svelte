@@ -25,14 +25,14 @@
         <code class="address-code">{$wallet.stxAddress}</code>
         <div class="button-group">
           <a href="/setup-profile" class="primary">Setup Profile</a>
-          <button class="secondary" on:click={handleLogout}>Logout</button>
+          <button class="secondary" onclick={handleLogout}>Logout</button>
         </div>
       </div>
     {:else}
       <p>Connect your Stacks wallet to get started.</p>
       <div class="button-group">
-        <button class="primary" on:click={() => handleLogin('leather')}>Connect Leather</button>
-        <button class="secondary" on:click={() => handleLogin('xverse')}>Connect Xverse</button>
+        <button class="primary" onclick={() => handleLogin('leather')}>Connect Leather</button>
+        <button class="secondary" onclick={() => handleLogin('xverse')}>Connect Xverse</button>
       </div>
     {/if}
 

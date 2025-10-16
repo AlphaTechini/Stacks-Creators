@@ -1,7 +1,7 @@
 <script>
   import { wallet } from '$lib/stores/wallet.js';
-  import { generateAnimatedImage } from '$lib/aiService.js';
-  import { uploadToCloudinary, mintNFT } from '$lib/api.js';
+  import { preventDefault } from '$lib/actions.js';
+  import { generateAndMintNFT } from '$lib/api.js';
   import MintSuccess from './MintSuccess.svelte';
 
   let title = $state('');
@@ -36,23 +36,15 @@
     result = null;
 
     try {
-      progress = "Generating AI image (this may take a minute)...";
-      const aiImageBlob = await generateAnimatedImage(file);
+      progress = "Generating AI & Minting NFT (this may take a minute)...";
 
-      progress = "Uploading to Cloudinary...";
-      const cloudinaryRes = await uploadToCloudinary($wallet.token, aiImageBlob);
-      if (!cloudinaryRes.secure_url) {
-        throw new Error('Failed to get URL from Cloudinary.');
-      }
-
-      progress = "Minting NFT on Stacks...";
-      const response = await mintNFT($wallet.token, title, description, cloudinaryRes.secure_url);
-
+      // Call the new single endpoint that handles the entire pipeline
+      const response = await generateAndMintNFT($wallet.token, file, title, description);
       if (!response.success) {
         throw new Error(response.error || 'An unknown error occurred during minting.');
       }
 
-      result = response; // { success: true, txId, tokenId, mediaUrl }
+      result = response; // { success: true, txId, mediaUrl }
       progress = "Completed ✅";
     } catch (error) {
       console.error('Minting failed:', error);
@@ -67,7 +59,7 @@
 <div class="mint-container">
   {#if result?.success}
     <MintSuccess txId={result.txId} mediaUrl={result.mediaUrl} />
-  {:else}
+  {:else if !isMinting}
     <form onsubmit={handleSubmit} use:preventDefault>
       <div class="form-group">
         <label for="file-upload">Artwork</label>
@@ -111,6 +103,10 @@
         <p class="error-message">{errorMessage}</p>
       {/if}
     </form>
+  {:else}
+    <div class="progress-container">
+      <p>{progress}</p>
+    </div>
   {/if}
 </div>
 
@@ -133,6 +129,12 @@
   .file-input {
     padding: 0;
     border: none;
+  }
+  .progress-container {
+    text-align: center;
+    padding: 2rem;
+    font-size: 1.2rem;
+    font-weight: 600;
   }
   .error-message {
     color: #fc8181; /* A reddish color for errors */
