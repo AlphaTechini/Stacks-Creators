@@ -1,34 +1,38 @@
 <script>
-  import { getNFTs } from '$lib/api.js';
-  import { txStore } from '$lib/stores/tx.js';
+	import { getNFTs } from '$lib/api.js';
+	import { txStore } from '$lib/stores/tx.js';
+	import { browser } from '$app/environment';
 
-  let nfts = $state([]);
-  let isLoading = $state(true);
-  let error = $state('');
+	let nfts = $state([]);
+	let isLoading = $state(true);
+	let error = $state('');
 
-  async function loadNFTs() {
-    isLoading = true;
-    try {
-      nfts = await getNFTs();
-    } catch (e) {
-      error = e.message;
-    } finally {
-      isLoading = false;
-    }
-  }
+	async function loadNFTs() {
+		isLoading = true;
+		error = '';
+		try {
+			nfts = await getNFTs();
+		} catch (e) {
+			error = e.message;
+		} finally {
+			isLoading = false;
+		}
+	}
 
-  // Initial load
-  loadNFTs();
-
-  // Svelte 5 effect: This will re-run whenever the refresh trigger changes.
-  $effect(() => {
-    const refreshCount = $txStore.refresh;
-    if (refreshCount > 0) {
-      console.log('Transaction confirmed, refreshing gallery...');
-      loadNFTs();
-    }
-  })
+	// Only on client
+	if (browser) {
+		loadNFTs();
+		$effect(() => {
+			const refreshCount = $txStore.refresh;
+			if (refreshCount > 0) {
+				console.log('Transaction confirmed, refreshing gallery...');
+				loadNFTs();
+			}
+		});
+	}
 </script>
+
+<!-- rest stays the same -->
 
 <section class="gallery-container">
   <div class="header">
