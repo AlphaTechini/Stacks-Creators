@@ -1,5 +1,21 @@
 import { UserProfile } from '../models/UserProfile.js';
 import { verifyToken } from '../utils/jwt.js';
+import { createHelia } from 'helia';
+import { unixfs } from '@helia/unixfs';
+import { CID } from 'multiformats/cid';
+
+// --- Helia (IPFS) Initialization ---
+const helia = await createHelia();
+const fs = unixfs(helia);
+
+// Helper to get content from IPFS
+async function getFromIPFS(cid) {
+  let data = '';
+  for await (const chunk of fs.cat(CID.parse(cid))) {
+    data += new TextDecoder().decode(chunk);
+  }
+  return data;
+}
 
 /**
  * A pre-handler hook to verify the JWT from the Authorization header.
@@ -26,93 +42,82 @@ async function requireAuth(request, reply) {
  */
 export default async function creatorRoutes(fastify, options) {
   /**
-   * Route to register or update a creator's profile.
-   * Creates a profile if one doesn't exist for the address, otherwise updates it.
-   * Payload: { username, bio, avatar, socials: { twitter, github } }
+   * POST /api/creator/sync - Syncs user profile data to IPFS.
+   * Creates a profile if one doesn't exist, otherwise updates it.
+   * The wallet address is the primary key, derived from the auth token.
+   *
+   * Input: { content?: string | object, username?: string }
+   *   - `content`: The JSON string or object for the user's profile.
+   *   - `username`: An optional display name.
+   *
+   * Returns: { walletAddress, cid, username }
    */
-  fastify.post('/api/creator/register', { preHandler: [requireAuth] }, async (request, reply) => {
-    const address = request.user.sub;
-    const { username, bio, avatar, socials } = request.body;
+  fastify.post('/api/creator/sync', { preHandler: [requireAuth] }, async (request, reply) => {
+    const { content, username } = request.body;
+    const walletAddress = request.user.sub;
 
     try {
-      const profile = await UserProfile.findOneAndUpdate(
-        { address },
-        { address, username, bio, avatar, socials },
-        { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-      );
-      return profile;
-    } catch (error) {
-      if (error.code === 11000) {
-        // Duplicate key error (likely for username)
-        return reply.code(409).send({ error: 'Username is already taken.' });
-      }
-      fastify.log.error(error, 'Error registering creator profile');
-      return reply.code(500).send({ error: 'An error occurred while saving the profile.' });
-    }
-  });
+      const user = await UserProfile.findOne({ address: walletAddress });
+      let newCid = user ? user.cid : null;
 
-  /**
-   * Route to get the currently authenticated user's profile.
-   */
-  fastify.get('/api/creator/me', { preHandler: [requireAuth] }, async (request, reply) => {
-    const address = request.user.sub;
-    const profile = await UserProfile.findOne({ address });
-
-    if (!profile) {
-      return reply.code(404).send({ error: 'Profile not found.' });
-    }
-    return profile;
-  });
-
-  /**
-   * Route to get a public creator profile by their wallet address.
-   */
-  fastify.get('/api/creator/:address', async (request, reply) => {
-    const { address } = request.params;
-    const profile = await UserProfile.findOne({ address });
-
-    if (!profile) {
-      return reply.code(404).send({ error: 'Profile not found for the given address.' });
-    }
-    return profile;
-  });
-
-  /**
-   * Route to partially update the authenticated user's profile.
-   * Payload: { bio, avatar, socials }
-   */
-  fastify.patch('/api/creator/update', { preHandler: [requireAuth] }, async (request, reply) => {
-    const address = request.user.sub;
-    const updates = {};
-
-    // Only include fields that are present in the request body
-    if (request.body.bio !== undefined) updates.bio = request.body.bio;
-    if (request.body.avatar !== undefined) updates.avatar = request.body.avatar;
-    if (request.body.socials !== undefined) {
-      // Allow partial updates to socials
-      updates['socials.twitter'] = request.body.socials.twitter;
-      updates['socials.github'] = request.body.socials.github;
-    }
-
-    if (Object.keys(updates).length === 0) {
-      return reply.code(400).send({ error: 'No fields to update were provided.' });
-    }
-
-    try {
-      const updatedProfile = await UserProfile.findOneAndUpdate(
-        { address },
-        { $set: updates },
-        { new: true }
-      );
-
-      if (!updatedProfile) {
-        return reply.code(404).send({ error: 'Profile not found to update.' });
+      // If new content is provided, upload it to IPFS to get a new CID.
+      if (content) {
+        const contentBuffer = Buffer.from(typeof content === 'object' ? JSON.stringify(content) : content);
+        const { cid } = await fs.addBytes(contentBuffer);
+        newCid = cid.toString();
       }
 
-      return updatedProfile;
+      if (!user) {
+        // Create a new user record if one doesn't exist.
+        const newUser = await UserProfile.create({
+          address: walletAddress,
+          username: username || null,
+          cid: newCid,
+        });
+        return reply.code(201).send({
+          walletAddress: newUser.address,
+          cid: newUser.cid,
+          username: newUser.username,
+        });
+      } else {
+        // Update existing user record.
+        user.cid = newCid ?? user.cid; // Keep old CID if no new content
+        user.username = username || user.username; // Update username if provided
+        await user.save();
+
+        return reply.send({
+          walletAddress: user.address,
+          cid: user.cid,
+          username: user.username,
+        });
+      }
     } catch (error) {
-      fastify.log.error(error, 'Error updating creator profile');
-      return reply.code(500).send({ error: 'An error occurred while updating the profile.' });
+      fastify.log.error(error, 'Error syncing creator profile');
+      return reply.code(500).send({ error: 'An error occurred during profile sync.' });
     }
+  });
+
+  /**
+   * POST /api/creator/fetch - Fetches user profile content from IPFS.
+   *
+   * Input: { walletAddress: string }
+   * Returns: { walletAddress, username, content }
+   */
+  fastify.post('/api/creator/fetch', async (request, reply) => {
+    const { walletAddress } = request.body;
+    if (!walletAddress) {
+      return reply.code(400).send({ error: 'walletAddress is required.' });
+    }
+
+    const user = await UserProfile.findOne({ address: walletAddress });
+    if (!user) {
+      return reply.code(404).send({ error: 'User not found.' });
+    }
+
+    if (!user.cid) {
+      return { walletAddress: user.address, username: user.username, content: null };
+    }
+    const content = await getFromIPFS(user.cid);
+    return { walletAddress: user.address, username: user.username, content };
   });
 }

@@ -10,7 +10,6 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"lint": "eslint ."
 	},
-
 	"devDependencies": {
 		"@eslint/compat": "latest",
 		"@eslint/js": "latest",
@@ -28,5 +27,8 @@
 		"tailwindcss": "latest",
 		"vite": "latest",
 		"vite-plugin-devtools-json": "latest"
+	},
+	"dependencies": {
+		"firebase": "^12.4.0"
 	}
 }
