@@ -6,54 +6,49 @@
 	import { handleLogin, handleLogout } from '$lib/stacksClient.js';
 
 	let { children } = $props();
-
-	// Theme store
 	const theme = writable('dark');
 
-	// Svelte 5: Initialize wallet store from localStorage
-	$effect.pre(() => {
-		if (browser) {
-			const storedToken = localStorage.getItem('stacks_token');
-			if (storedToken) {
-				try {
-					const payload = JSON.parse(atob(storedToken.split('.')[1]));
-					if (payload.exp * 1000 > Date.now()) {
-						wallet.set({ stxAddress: payload.sub, token: storedToken, isLoading: false });
-					} else {
-						handleLogout(); // Token expired
-					}
-				} catch (e) {
-					handleLogout(); // Invalid token
+	// Only run on client-side
+	if (browser) {
+		// Initialize wallet from localStorage
+		const storedToken = localStorage.getItem('stacks_token');
+		if (storedToken) {
+			try {
+				const payload = JSON.parse(atob(storedToken.split('.')[1]));
+				if (payload.exp * 1000 > Date.now()) {
+					wallet.set({ stxAddress: payload.sub, token: storedToken, isLoading: false });
+				} else {
+					handleLogout();
 				}
-			} else {
-				wallet.set({ stxAddress: null, token: null, isLoading: false });
+			} catch (e) {
+				handleLogout();
 			}
+		} else {
+			wallet.set({ stxAddress: null, token: null, isLoading: false });
 		}
-	});
 
-	// This is a Svelte 4 onMount equivalent for the theme store.
-	// In Svelte 5, you might handle this differently, but this works.
-	$effect(() => {
-		if (browser) {
+		// Handle theme
+		$effect(() => {
 			const storedTheme = localStorage.getItem('theme');
 			if (storedTheme && (storedTheme === 'light' || storedTheme === 'dark')) {
 				theme.set(storedTheme);
 			}
-		}
 
-		// Apply theme to the document
-		theme.subscribe((value) => {
-			if (browser) {
+			const unsubscribe = theme.subscribe((value) => {
 				document.documentElement.setAttribute('data-theme', value);
 				localStorage.setItem('theme', value);
-			}
+			});
+
+			return unsubscribe;
 		});
-	});
+	}
 
 	function toggleTheme() {
 		theme.update((current) => (current === 'dark' ? 'light' : 'dark'));
 	}
 </script>
+
+<!-- rest of template stays the same -->
 
 <svelte:head>
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
