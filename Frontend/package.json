@@ -27,8 +27,5 @@
 		"tailwindcss": "latest",
 		"vite": "latest",
 		"vite-plugin-devtools-json": "latest"
-	},
-	"dependencies": {
-		"firebase": "^12.4.0"
 	}
 }

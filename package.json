@@ -11,6 +11,7 @@
     "dotenv": "^17.2.3",
     "fastify": "^5.6.1",
     "fastify-cors": "^6.0.3",
+    "firebase": "^12.4.0",
     "form-data": "^4.0.4",
     "helia": "^6.0.2",
     "multiformats": "^13.4.1",
