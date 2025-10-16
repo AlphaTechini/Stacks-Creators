@@ -1,19 +1,16 @@
 [project]
 name = "stacks-creators"
-authors = []
-description = "Contracts for the Stacks Creators dApp"
-telemetry = true
+authors = ["AlphaTechini"]
+description = "NFT minting and marketplace platform for creators and fans."
+telemetry = false
 
 [contracts.sip009-nft-trait]
-path = "contracts/sip009-nft-trait.clar"
+path = "contract/sip009-nft-trait.clar"
 
 [contracts.creator-nft]
-path = "contracts/creator-nft.clar"
-depends_on = []
+path = "contract/creator-nft.clar"
+depends_on = ["sip009-nft-trait"]
 
 [contracts.marketplace]
-path = "contracts/marketplace.clar"
-depends_on = ["creator-nft"]
-[contracts.marketplace]
-path = "contracts/marketplace.clar"
+path = "contract/marketplace.clar"
 depends_on = ["creator-nft"]
