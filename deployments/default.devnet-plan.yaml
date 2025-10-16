@@ -1,50 +1,32 @@
+---
+id: 0
+name: Devnet deployment
+network: devnet
+stacks-node: "http://localhost:20443"
+bitcoin-node: "http://devnet:devnet@localhost:18443"
 plan:
-  # Accounts for simulation
-  accounts:
-    deployer:
-      balance: 100000000000  # 100 STX for deployment
-    user1:
-      balance: 50000000000
-    user2:
-      balance: 50000000000
-
-  # Deployment sequence
-  steps:
-    - name: deploy sip009-nft-trait
-      contract_id: SP000000000000000000002Q6VF78.creator-trait
-      path: contract/sip009-nft-trait.clar
-      anchor_block: 1
-
-    - name: deploy creator-nft
-      contract_id: SP000000000000000000002Q6VF78.creator-nft
-      path: contract/creator-nft.clar
-      depends_on:
-        - deploy sip009-nft-trait
-      anchor_block: 2
-
-    - name: deploy marketplace
-      contract_id: SP000000000000000000002Q6VF78.marketplace
-      path: contract/marketplace.clar
-      depends_on:
-        - deploy creator-nft
-      anchor_block: 3
-
-  # Optional function calls to test after deploy
-  executions:
-    - comment: "Mint a test NFT"
-      contract_call:
-        contract_id: SP000000000000000000002Q6VF78.creator-nft
-        function: mint
-        arguments:
-          - "SP000000000000000000002Q6VF78"  # recipient
-          - "\"https://example.com/metadata/1.json\""  # metadata URI
-        sender: deployer
-
-    - comment: "List test NFT for sale"
-      contract_call:
-        contract_id: SP000000000000000000002Q6VF78.marketplace
-        function: list-token
-        arguments:
-          - "u1"
-          - "u1000000"  # 1 STX
-        sender: deployer
+  batches:
+    - id: 0
+      transactions:
+        - contract-publish:
+            contract-name: sip009-nft-trait
+            expected-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            cost: 3880
+            path: contract/sip009-nft-trait.clar
+            anchor-block-only: true
+            clarity-version: 1
+        - contract-publish:
+            contract-name: creator-nft
+            expected-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            cost: 42510
+            path: contract/creator-nft.clar
+            anchor-block-only: true
+            clarity-version: 1
+        - contract-publish:
+            contract-name: marketplace
+            expected-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            cost: 33550
+            path: contract/marketplace.clar
+            anchor-block-only: true
+            clarity-version: 1
+      epoch: "2.05"
