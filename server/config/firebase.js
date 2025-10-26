@@ -20,3 +20,8 @@ const db = getFirestore(app);
 
 // 5. Export Firestore and functions to use in backend routes
 export { db, collection, doc, getDoc, getDocs, setDoc, updateDoc };
+
+/**
+ * @returns {import('firebase/firestore').Firestore} The Firestore database instance.
+ */
+export const getDB = () => db;

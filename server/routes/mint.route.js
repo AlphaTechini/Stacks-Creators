@@ -1,5 +1,5 @@
 import { mintNFT } from '../services/nft.service.js';
-import { transformImage } from '../services/ai.service.js';
+import { transformImage } from '../services/ai.service.cjs';
 
 /**
  * Encapsulates the routes for NFT minting.

@@ -59,7 +59,7 @@ startEventListener();
 // Start the server
 const start = async () => {
   try {
-    await fastify.listen({ port: process.env.PORT || 3000, host: '0.0.0.0' });
+    await fastify.listen({ port: process.env.PORT || 3800, host: '0.0.0.0' });
     fastify.log.info(`Server listening on ${fastify.server.address().port}`);
   } catch (err) {
     fastify.log.error(err);

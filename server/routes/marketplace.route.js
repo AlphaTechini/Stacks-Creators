@@ -1,5 +1,6 @@
 import { db, doc, getDoc, getDocs, collection, updateDoc } from '../config/firebase.js';
-import { broadcastTransaction } from '../utils/stacksClient.js';
+import *  as stacksClient from '../utils/stacksClient.cjs';
+const { broadcastTransaction } = stacksClient;
 import StacksTransactions from '@stacks/transactions';
 const { deserializeTransaction } = StacksTransactions;
 

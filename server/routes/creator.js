@@ -3,17 +3,32 @@ import { createHelia } from 'helia';
 import { unixfs } from '@helia/unixfs';
 import { CID } from 'multiformats/cid';
 
-// --- Helia (IPFS) Initialization ---
-const helia = await createHelia();
-const fs = unixfs(helia);
+// --- Helia (IPFS) Lazy Initialization ---
+let heliaFs = null;
+
+/**
+ * Initializes the Helia IPFS node on first use and returns the unixfs instance.
+ * This prevents the node from starting automatically with the server.
+ */
+async function getFs() {
+  if (!heliaFs) {
+    console.log('[IPFS] Initializing Helia node for the first time...');
+    const helia = await createHelia();
+    heliaFs = unixfs(helia);
+    console.log('[IPFS] Helia node initialized successfully.');
+  }
+  return heliaFs;
+}
 
 // Helper to get content from IPFS
 async function getFromIPFS(cid) {
-  let data = '';
+  const fs = await getFs();
+  const decoder = new TextDecoder();
+  let content = '';
   for await (const chunk of fs.cat(CID.parse(cid))) {
-    data += new TextDecoder().decode(chunk);
+    content += decoder.decode(chunk, { stream: true });
   }
-  return data;
+  return content;
 }
 
 /**
@@ -39,6 +54,7 @@ export default async function creatorRoutes(fastify, options) {
     const walletAddress = request.user.sub;
 
     try {
+      const fs = await getFs(); // Ensure Helia is running
       const userRef = doc(db, 'users', walletAddress);
       const docSnap = await getDoc(userRef);
       const user = docSnap.exists() ? docSnap.data() : null;

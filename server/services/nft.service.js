@@ -11,7 +11,9 @@ const {
   callReadOnlyFunction,
   cvToJSON,
 } = StacksTransactions;
-import { network, broadcastTransaction } from '../utils/stacksClient.js';
+import * as stacksClient from '../utils/stacksClient.cjs';
+const { getNetwork, broadcastTransaction } = stacksClient;
+import { getDB } from '../config/firebase.js';
 
 // A simple in-memory lock to prevent race conditions during minting.
 let isMinting = false;
@@ -58,6 +60,7 @@ export async function mintNFT(creatorAddress, title, description, aiImageBuffer)
   isMinting = true;
 
   try {
+  const network = getNetwork();
   // STEP 1: Get the next available token ID directly from the smart contract.
   // This is the single source of truth for the NFT's ID.
   const nextTokenIdResult = await callReadOnlyFunction({
@@ -73,9 +76,8 @@ export async function mintNFT(creatorAddress, title, description, aiImageBuffer)
 
   // STEP 2: Upload media and metadata to Cloudinary using the correct tokenId.
   const { secure_url: mediaUrl } = await uploadToCloudinary(aiImageBuffer, 'nfts/media', tokenId.toString());
-  const { nonce } = await fetch(
-    `${network.coreApiUrl}/v2/accounts/${process.env.STACKS_SENDER_ADDRESS}`,
-  ).then(res => res.json());
+  // v7 network objects store the URL in `client.baseUrl`
+  const { nonce } = await fetch(`${network.client.baseUrl}/v2/accounts/${process.env.STACKS_SENDER_ADDRESS}`).then(res => res.json());
 
   // 2. Create and upload metadata JSON to Cloudinary
   const metadata = { title, description, image: mediaUrl };
@@ -113,4 +115,28 @@ export async function mintNFT(creatorAddress, title, description, aiImageBuffer)
   } finally {
     isMinting = false; // Release the lock
   }
+}
+
+/**
+ * Updates an NFT's on-chain data after a successful mint transaction.
+ * This function is called by the chain event listener.
+ *
+ * @param {object} eventData - The parsed data from the `nft_mint` print event.
+ * @param {string} txId - The ID of the minting transaction.
+ */
+export async function updateNFTOnMint(eventData, txId) {
+  const db = getDB();
+  const { token_id, recipient } = eventData;
+
+  if (!token_id || !recipient) {
+    console.error('[NFTService] Invalid event data for mint:', eventData);
+    return;
+  }
+
+  // In Firestore, the document ID should be the token ID.
+  const nftRef = db.collection('nfts').doc(String(token_id));
+  // Using set with merge:true will create the document if it doesn't exist, or update it if it does.
+  await nftRef.set({ owner: recipient, txId: txId, tokenId: Number(token_id) }, { merge: true });
+
+  console.log(`[NFTService] Synced NFT #${token_id} for owner ${recipient}.`);
 }

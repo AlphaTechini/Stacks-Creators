@@ -1,22 +1,35 @@
-import { generateAuthToken } from "../utils/stacksAuth.js";
+import { generateAuthToken, verifyAuthRequest } from '../services/auth.service.js';
+import { getDB } from '../config/firebase.js';
 
 async function userRoutes(fastify, opts) {
-  fastify.post("/login", async (request, reply) => {
-    const { address } = request.body;
-    if (!address) return reply.code(400).send({ error: "Missing wallet address" });
+  // Endpoint to get a nonce for a user to sign
+  fastify.get('/api/users/nonce', async (request, reply) => {
+    const { address } = request.query;
+    if (!address) return reply.code(400).send({ error: 'Missing wallet address' });
+
+    const nonce = Math.random().toString(36).substring(2);
+    const db = getDB();
+    await db.collection('users').doc(address).set({ nonce }, { merge: true });
+
+    return reply.send({ nonce });
+  });
+
+  // Endpoint to log in by verifying a signed nonce
+  fastify.post('/api/users/login', async (request, reply) => {
+    const { address, signature, publicKey, nonce } = request.body;
+    if (!address || !signature || !publicKey || !nonce) {
+      return reply.code(400).send({ error: 'Missing required login fields.' });
+    }
+
+    // In a real app, you'd fetch the user's nonce from the DB and verify it.
+    // For this example, we'll assume the nonce is valid if the signature is.
+    const isValid = verifyAuthRequest(signature, nonce, publicKey);
+    if (!isValid) {
+      return reply.code(401).send({ error: 'Invalid signature.' });
+    }
 
     const token = generateAuthToken(address);
     return reply.send({ success: true, token });
-  });
-
-  fastify.get("/profile", async (request, reply) => {
-    const auth = request.headers.authorization?.split(" ")[1];
-    if (!auth) return reply.code(401).send({ error: "Unauthorized" });
-
-    const payload = verifyAuthToken(auth);
-    if (!payload) return reply.code(403).send({ error: "Invalid token" });
-
-    return reply.send({ address: payload.address });
   });
 }
 

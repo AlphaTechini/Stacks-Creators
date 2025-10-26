@@ -1,47 +1,30 @@
 <script>
 	import '../app.css';
 	import { writable } from 'svelte/store';
-	import { browser } from '$app/environment';
+	import { onMount } from 'svelte';
 	import { wallet } from '$lib/stores/wallet.js';
-	import { handleLogin, handleLogout } from '$lib/stacksClient.js';
+	import ConnectButton from '$lib/components/ConnectButton.svelte';
 
 	let { children } = $props();
 	const theme = writable('dark');
 
-	// Only run on client-side
-	if (browser) {
-		// Initialize wallet from localStorage
-		const storedToken = localStorage.getItem('stacks_token');
-		if (storedToken) {
-			try {
-				const payload = JSON.parse(atob(storedToken.split('.')[1]));
-				if (payload.exp * 1000 > Date.now()) {
-					wallet.set({ stxAddress: payload.sub, token: storedToken, isLoading: false });
-				} else {
-					handleLogout();
-				}
-			} catch (e) {
-				handleLogout();
-			}
-		} else {
-			wallet.set({ stxAddress: null, token: null, isLoading: false });
-		}
+	onMount(() => {
+		// Load user session from local storage when the app mounts
+		wallet.load();
 
 		// Handle theme
-		$effect(() => {
-			const storedTheme = localStorage.getItem('theme');
-			if (storedTheme && (storedTheme === 'light' || storedTheme === 'dark')) {
-				theme.set(storedTheme);
-			}
+		const storedTheme = localStorage.getItem('theme');
+		if (storedTheme && (storedTheme === 'light' || storedTheme === 'dark')) {
+			theme.set(storedTheme);
+		}
 
-			const unsubscribe = theme.subscribe((value) => {
-				document.documentElement.setAttribute('data-theme', value);
-				localStorage.setItem('theme', value);
-			});
-
-			return unsubscribe;
+		const unsubscribe = theme.subscribe((value) => {
+			document.documentElement.setAttribute('data-theme', value);
+			localStorage.setItem('theme', value);
 		});
-	}
+
+		return unsubscribe;
+	});
 
 	function toggleTheme() {
 		theme.update((current) => (current === 'dark' ? 'light' : 'dark'));
@@ -63,19 +46,12 @@
 	<div class="header-content">
 		<a href="/" class="logo">✨ Stacks Creators</a>
 		<div class="controls">
-			{#if $wallet.stxAddress}
+			{#if $wallet.isConnected}
 				<a href="/gallery" class="nav-link">Gallery</a>
 				<a href="/dashboard" class="nav-link">Dashboard</a>
 			{/if}
 
-			{#if $wallet.stxAddress}
-				<div class="wallet-info">
-					<span class="address">{$wallet.stxAddress.slice(0, 5)}...{$wallet.stxAddress.slice(-5)}</span>
-					<button class="secondary" onclick={handleLogout}>Disconnect</button>
-				</div>
-			{:else if !$wallet.isLoading}
-				<!-- Connect buttons could go here, or be left on the main page -->
-			{/if}
+			<ConnectButton />
 
 			<button class="secondary" onclick={toggleTheme}>
 				{$theme === 'dark' ? '☀️' : '🌙'}
@@ -114,15 +90,6 @@
 		display: flex;
 		align-items: center;
 		gap: 1rem;
-	}
-	.wallet-info {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		background: var(--secondary-color);
-		padding: 0.25rem 0.25rem 0.25rem 0.75rem;
-		border-radius: 999px;
-		border: 1px solid var(--card-border);
 	}
 	main {
 		padding: 0 1.5rem;

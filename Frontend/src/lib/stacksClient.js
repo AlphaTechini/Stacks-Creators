@@ -1,11 +1,4 @@
-import { connect, request } from '@stacks/connect';
 import * as StacksTransactions from '@stacks/transactions';
-const {
-  createSTXPostCondition,
-  FungibleConditionCode,
-  uintCV,
-} = StacksTransactions;
-import { openContractCall } from '@stacks/connect';
 import { wallet } from './stores/wallet.js';
 import { fetchAPI } from './api.js'; // Assuming fetchAPI is exported from api.js
 
@@ -26,6 +19,7 @@ const WALLET_IDS = {
  * @returns {Promise<{stxAddress: string}>} A promise that resolves with the user's STX address.
  */
 export async function connectWithWallet(walletType) {
+  const { connect } = await import('@stacks/connect');
   const walletId = WALLET_IDS[walletType];
   if (!walletId) {
     throw new Error(`Invalid wallet type specified: ${walletType}`);
@@ -108,6 +102,7 @@ export function handleLogout() {
  * @returns {Promise<string>} The hex-encoded signed transaction.
  */
 export async function createListTx(tokenId, price) {
+  const { openContractCall, uintCV } = await import('@stacks/connect');
   return new Promise((resolve, reject) => {
     openContractCall({
       contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS,
@@ -132,6 +127,12 @@ export async function createListTx(tokenId, price) {
  * @returns {Promise<string>} The hex-encoded signed transaction.
  */
 export async function createBuyTx(tokenId, price, userAddress) {
+  const { openContractCall, uintCV } = await import('@stacks/connect');
+  const {
+    createSTXPostCondition,
+    FungibleConditionCode,
+  } = await import('@stacks/transactions');
+
   return new Promise((resolve, reject) => {
     openContractCall({
       contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS,
@@ -173,6 +174,7 @@ export async function broadcastSignedTx(token, txType, signedTx) {
  * @returns {Promise<{publicKey: string, signature: string}>} A promise that resolves with the public key and signature.
  */
 export async function signMessage(message) {
+  const { request } = await import('@stacks/connect');
   try {
     const signatureData = await request('stx_signMessage', {
       message,
