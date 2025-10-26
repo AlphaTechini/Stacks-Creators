@@ -5,6 +5,11 @@ import { updateNFTOnMint } from './nft.service.js';
 import { getDB } from '../config/firebase.js';
 import { NodeWebSocketWrapper } from '../utils/websocket-wrapper.js';
 
+const client = new StacksApiWebSocketClient(wsUrl.toString(), {
+  WebSocket: NodeWebSocketWrapper
+});
+
+
 function parseClarityValue(repr) {
   const data = {};
   // Simplified parser for tuples like `(tuple (key val) (key2 val))`

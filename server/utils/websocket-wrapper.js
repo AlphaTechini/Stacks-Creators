@@ -1,28 +1,23 @@
 import WebSocket from 'ws';
 
-/**
- * Node-compatible WebSocket wrapper for Stacks v7.2.
- * Makes 'ws' behave like a browser WebSocket.
- */
-export class NodeWebSocketWrapper {
-  constructor(url) {
-    const ws = new WebSocket(url);
+export class NodeWebSocketWrapper extends WebSocket {
+  constructor(url, protocols) {
+    super(url, protocols);
 
-    // Polyfill browser-like event methods
-    ws.addEventListener = (event, listener) => {
-      ws.on(event, (data) => {
+    // patch addEventListener & removeEventListener
+    this.addEventListener = (event, listener) => {
+      this.on(event, (data) => {
+        // If message event, wrap as object with `.data`
         if (event === 'message') {
-          listener({ data: data.toString() }); // mimic MessageEvent
+          listener({ data: data.toString() });
         } else {
           listener(data);
         }
       });
     };
 
-    ws.removeEventListener = (event, listener) => {
-      ws.off(event, listener);
+    this.removeEventListener = (event, listener) => {
+      this.off(event, listener);
     };
-
-    return ws;
   }
 }
