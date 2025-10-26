@@ -1,7 +1,6 @@
 // src/lib/stores/wallet.js
 import { writable } from 'svelte/store';
-import * as Connect from '@stacks/connect';
-const { getLocalStorage } = Connect;
+import { getLocalStorage } from '@stacks/connect';
 
 /**
  * @typedef {object} WalletStore
@@ -46,7 +45,7 @@ function createWalletStore() {
 				stxAddress: null,
 				userData: null,
 				token: null,
-			}));
+			});
 		}
 	}
 

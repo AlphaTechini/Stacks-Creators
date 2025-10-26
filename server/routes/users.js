@@ -1,36 +1,63 @@
-import { generateAuthToken, verifyAuthRequest } from '../services/auth.service.js';
-import { getDB } from '../config/firebase.js';
+import { verifyMessageSignature } from '@stacks/encryption';
+import StacksNetwork from '@stacks/network';
+const { StacksTestnet } = StacksNetwork;
+import { getDB, doc, getDoc } from '../config/firebase.js';
 
-async function userRoutes(fastify, opts) {
-  // Endpoint to get a nonce for a user to sign
-  fastify.get('/api/users/nonce', async (request, reply) => {
-    const { address } = request.query;
-    if (!address) return reply.code(400).send({ error: 'Missing wallet address' });
+/**
+ * Fastify plugin for user authentication.
+ * @param {import('fastify').FastifyInstance} fastify
+ * @param {object} options
+ */
+export default async function userRoutes(fastify, options) {
+	const db = getDB();
 
-    const nonce = Math.random().toString(36).substring(2);
-    const db = getDB();
-    await db.collection('users').doc(address).set({ nonce }, { merge: true });
+	/**
+	 * GET /api/users/nonce - Generates a unique nonce for a user to sign.
+	 * This is the first step in the authentication process.
+	 */
+	fastify.get('/api/users/nonce', async (request, reply) => {
+		const { address } = request.query;
+		if (!address) {
+			return reply.code(400).send({ error: 'Wallet address is required.' });
+		}
+		// In a real app, you'd generate and store a unique, single-use nonce.
+		// For this example, we'll use a static but descriptive message.
+		const nonce = `Sign this message to log in to Stacks Creators. Nonce: ${Date.now()}`;
+		return { nonce };
+	});
 
-    return reply.send({ nonce });
-  });
+	/**
+	 * POST /api/users/login - Verifies a signed nonce and returns a JWT.
+	 */
+	fastify.post('/api/users/login', async (request, reply) => {
+		const { address, publicKey, signature, nonce } = request.body;
 
-  // Endpoint to log in by verifying a signed nonce
-  fastify.post('/api/users/login', async (request, reply) => {
-    const { address, signature, publicKey, nonce } = request.body;
-    if (!address || !signature || !publicKey || !nonce) {
-      return reply.code(400).send({ error: 'Missing required login fields.' });
-    }
+		if (!address || !publicKey || !signature || !nonce) {
+			return reply.code(400).send({ error: 'Missing required login fields.' });
+		}
 
-    // In a real app, you'd fetch the user's nonce from the DB and verify it.
-    // For this example, we'll assume the nonce is valid if the signature is.
-    const isValid = verifyAuthRequest(signature, nonce, publicKey);
-    if (!isValid) {
-      return reply.code(401).send({ error: 'Invalid signature.' });
-    }
+		try {
+			const verified = verifyMessageSignature({
+				message: nonce,
+				publicKey,
+				signature,
+			});
 
-    const token = generateAuthToken(address);
-    return reply.send({ success: true, token });
-  });
+			if (!verified) {
+				return reply.code(403).send({ error: 'Invalid signature.' });
+			}
+
+			// Signature is valid, generate a JWT.
+			const token = fastify.jwt.sign({ sub: address }); // 'sub' (subject) is the standard claim for user ID
+
+			// Optional: Check if user exists in Firestore
+			const userRef = doc(db, 'users', address);
+			const docSnap = await getDoc(userRef);
+
+			return { token, isNewUser: !docSnap.exists() };
+		} catch (error) {
+			fastify.log.error(error, 'Error during login verification');
+			return reply.code(500).send({ error: 'An error occurred during login.' });
+		}
+	});
 }
-
-export default userRoutes;

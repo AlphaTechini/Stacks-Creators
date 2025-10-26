@@ -1,82 +1,68 @@
-import { wallet } from './stores/wallet.js';
 import { fetchAPI } from './api.js'; // Assuming fetchAPI is exported from api.js
-import * as Connect from '@stacks/connect';
+import { request, signMessage, disconnect as stacksDisconnect, openContractCall } from '@stacks/connect';
 import * as StacksTransactions from '@stacks/transactions'; // Keep for cvToHex, etc.
-const { connect, disconnect: stacksDisconnect, sign, getLocalStorage } = Connect;
+
 const {
-  uintCV,
   createSTXPostCondition,
   FungibleConditionCode,
+  uintCV,
   cvToHex,
 } = StacksTransactions;
 
-/**
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3800';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
-/**
- * Full authentication flow
- * 1. Connect to the selected wallet.
- * 2. Fetch a nonce from the backend.
- * 3. Sign the nonce with the wallet.
- * 4. Send the signature to the backend to get a JWT.
- * 5. Store the JWT and update the global wallet store.
- */
-export function handleLogin() {
-  wallet.update(s => ({ ...s, isLoading: true }));
-
-  const authOptions = {
+export function handleLogin() { 
+  showConnect({
     appDetails: {
       name: 'Stacks Creators',
-      icon: window.location.origin + '/logo.svg',
+      icon: window.location.origin + '/logo.svg', // Ensure you have a logo here
     },
-    onFinish: async (payload) => {
-      try {
-        // NOTE: In v7, stxAddress is an object with mainnet/testnet properties
-        const address = payload.stxAddress.testnet;
-        const publicKey = payload.publicKey;
+    onFinish: async (response) => {
+      const stxAddress = response.addresses.find(addr => addr.address.startsWith('S'))?.address;
+      if (!stxAddress) {
+        console.error('No STX address found in wallet response.');
+        return;
+      }
 
-        const nonceResponse = await fetch(`${BACKEND_URL}/api/users/nonce?address=${address}`);
+      try {
+        // The user is signed in, now we need to authenticate with our backend
+        const nonceResponse = await fetch(`${BACKEND_URL}/api/users/nonce?address=${stxAddress}`);
         if (!nonceResponse.ok) throw new Error('Failed to fetch nonce from server.');
         const { nonce } = await nonceResponse.json();
 
-        const { signature } = await sign({
-          message: nonce,
-          publicKey: publicKey,
+        const signatureData = await signMessage({ message: nonce });
+
+        const loginResponse = await fetchAPI('/api/users/login', 'POST', null, {
+          address: stxAddress,
+          publicKey: signatureData.publicKey,
+          signature: signatureData.signature,
+          nonce,
         });
 
-        const loginResponse = await fetch(`${BACKEND_URL}/api/users/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ address, publicKey, signature, nonce }),
-        });
-
-        if (!loginResponse.ok) {
-          const errorData = await loginResponse.json();
-          throw new Error(errorData.error || 'Login failed.');
-        }
-
-        const { token } = await loginResponse.json();
-        localStorage.setItem('stacks_token', token);
-        wallet.set({ stxAddress: address, token, isLoading: false, isConnected: true, userData: getLocalStorage() });
-        console.log('Login successful! JWT stored.');
+        localStorage.setItem('stacks_token', loginResponse.token);
+        console.log('Backend login successful! JWT stored.');
+        // Manually trigger a reload to ensure all stores are updated correctly.
+        location.reload();
       } catch (error) {
         console.error('Login process failed:', error.message);
-        handleLogout(); // Ensure clean state on failure
+      } finally {
+        // No need for a reload here as it's handled on success.
       }
     },
     onCancel: () => {
       console.log('Login process cancelled by user.');
-      wallet.update(s => ({ ...s, isLoading: false }));
-    },
-  };
+    }
+  });
 
-  connect(authOptions);
+  function showConnect(options) {
+    request(options, 'getAddresses');
+  }
 }
 
 export function handleLogout() {
-  stacksDisconnect(); // Use the disconnect function from @stacks/connect
   localStorage.removeItem('stacks_token');
-  wallet.set({ stxAddress: null, token: null, isLoading: false, isConnected: false, userData: null });
+  stacksDisconnect();
+  location.reload();
 }
 
 /**
@@ -86,17 +72,16 @@ export function handleLogout() {
  * @returns {Promise<string>} The hex-encoded signed transaction.
  */
 export async function createListTx(tokenId, price) {
-  // v7 does not have a direct `request` equivalent for this.
-  // This function would need to be implemented using `openContractCall`
-  // which also uses a callback pattern. For now, we'll leave it as a placeholder.
-  console.warn('createListTx is not fully implemented for @stacks/connect v7');
-  // const response = await openContractCall({
-  //   contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS,
-  //   contractName: import.meta.env.VITE_STACKS_CONTRACT_NAME_MARKET,
-  //   functionName: 'list-token',
-  //   functionArgs: [uintCV(tokenId), uintCV(price)],
-  // });
-  // return response.txId; // v7 returns txId directly
+  const response = await request('stx_callContract', {
+    contract: `${import.meta.env.VITE_CONTRACT_ADDRESS}.${import.meta.env.VITE_STACKS_CONTRACT_NAME_MARKET}`,
+    functionName: 'list-token',
+    functionArgs: [cvToHex(uintCV(tokenId)), cvToHex(uintCV(price))],
+    appDetails: {
+      name: 'Stacks Creators',
+      icon: window.location.origin + '/logo.svg',
+    },
+  });
+  return response.txId;
 }
 
 /**
@@ -107,24 +92,17 @@ export async function createListTx(tokenId, price) {
  * @returns {Promise<string>} The hex-encoded signed transaction.
  */
 export async function createBuyTx(tokenId, price, userAddress) {
-  const postCondition = createSTXPostCondition(
-    userAddress,
-    FungibleConditionCode.Equal,
-    price
-  );
-
-  // v7 does not have a direct `request` equivalent for this.
-  // This function would need to be implemented using `openContractCall`
-  // which also uses a callback pattern. For now, we'll leave it as a placeholder.
-  console.warn('createBuyTx is not fully implemented for @stacks/connect v7');
-  // const response = await openContractCall({
-  //   contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS,
-  //   contractName: import.meta.env.VITE_STACKS_CONTRACT_NAME_MARKET,
-  //   functionName: 'buy-token',
-  //   functionArgs: [uintCV(tokenId), uintCV(price)],
-  //   postConditions: [postCondition],
-  // });
-  // return response.txId;
+  const response = await request('stx_callContract', {
+    contract: `${import.meta.env.VITE_CONTRACT_ADDRESS}.${import.meta.env.VITE_STACKS_CONTRACT_NAME_MARKET}`,
+    functionName: 'buy-token',
+    functionArgs: [cvToHex(uintCV(tokenId))],
+    postConditions: [createSTXPostCondition(userAddress, FungibleConditionCode.Equal, price)],
+    appDetails: {
+      name: 'Stacks Creators',
+      icon: window.location.origin + '/logo.svg',
+    },
+  });
+  return response.txId;
 }
 
 /**
