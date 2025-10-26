@@ -1,5 +1,6 @@
-import { db, doc, getDoc, setDoc } from '../config/firebase.js';
+import { getDB } from '../config/firebase.js';
 import { createHelia } from 'helia';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { unixfs } from '@helia/unixfs';
 import { CID } from 'multiformats/cid';
 
@@ -38,6 +39,7 @@ async function getFromIPFS(cid) {
  */
 export default async function creatorRoutes(fastify, options) {
   /**
+   *
    * POST /api/creator/sync - Syncs user profile data. Content goes to IPFS, metadata to Firestore.
    * Creates a profile if one doesn't exist, otherwise updates it.
    * The wallet address is the primary key, derived from the auth token.
@@ -53,6 +55,7 @@ export default async function creatorRoutes(fastify, options) {
     const { content, username } = request.body;
     const walletAddress = request.user.sub;
 
+    const db = getDB();
     try {
       const fs = await getFs(); // Ensure Helia is running
       const userRef = doc(db, 'users', walletAddress);
@@ -103,6 +106,7 @@ export default async function creatorRoutes(fastify, options) {
       return reply.code(400).send({ error: 'walletAddress is required.' });
     }
 
+    const db = getDB();
     const userRef = doc(db, 'users', walletAddress);
     const docSnap = await getDoc(userRef);
 

@@ -98,14 +98,4 @@
 		background: var(--primary-color-hover);
 		transform: translateY(-2px) scale(1.02);
 	}
-
-	.secondary {
-		background: var(--secondary-color);
-		color: var(--secondary-text);
-		border: 1px solid var(--card-border);
-	}
-
-	.secondary:hover {
-		background: var(--secondary-color-hover);
-	}
 </style>

@@ -140,3 +140,23 @@ export async function updateNFTOnMint(eventData, txId) {
 
   console.log(`[NFTService] Synced NFT #${token_id} for owner ${recipient}.`);
 }
+
+/**
+ * Fetches all NFTs from Firestore for a given owner address.
+ * @param {string} ownerAddress The Stacks address of the owner.
+ * @returns {Promise<Array<object>>} A promise that resolves to an array of NFT documents.
+ */
+export async function getNFTsByOwner(ownerAddress) {
+  const db = getDB();
+  const nftsRef = db.collection('nfts');
+  const q = nftsRef.where('owner', '==', ownerAddress);
+
+  const snapshot = await q.get();
+  if (snapshot.empty) {
+    return [];
+  }
+
+  const nfts = [];
+  snapshot.forEach(doc => nfts.push(doc.data()));
+  return nfts;
+}
