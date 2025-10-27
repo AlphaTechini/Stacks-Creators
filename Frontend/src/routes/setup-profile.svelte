@@ -1,8 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+  import { syncCreatorProfile } from '$lib/api.js';
 
   let profile = {
     username: '',
@@ -19,16 +18,13 @@
   let isLoading = false;
   let errorMessage = '';
   let successMessage = '';
-  let token = '';
 
   onMount(() => {
-    token = localStorage.getItem('stacks_token');
+    const token = localStorage.getItem('stacks_token');
     if (!token) {
       // If no token is found, the user is not authenticated. Redirect to onboarding.
       goto('/');
     }
-    // Optional: Fetch existing profile data if user is returning to edit.
-    // This would involve a call to GET /api/creator/me
   });
 
   /**
@@ -61,21 +57,13 @@
     successMessage = '';
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/creator/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(profile),
-      });
+      const payload = {
+        username: profile.username,
+        content: profile,
+      };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save profile.');
-      }
-
-      const savedProfile = await response.json();
+      // Use the centralized API function which handles the token and URL correctly.
+      const savedProfile = await syncCreatorProfile(payload);
       console.log('Profile saved:', savedProfile);
 
       // Show success and redirect

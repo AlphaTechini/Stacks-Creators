@@ -102,7 +102,7 @@ export default async function creatorRoutes(fastify, options) {
    */
   fastify.post('/api/creator/fetch', async (request, reply) => {
     const { walletAddress } = request.body;
-    if (!walletAddress) {
+    if (!walletAddress || typeof walletAddress !== 'string' || walletAddress.trim() === '') {
       return reply.code(400).send({ error: 'walletAddress is required.' });
     }
 

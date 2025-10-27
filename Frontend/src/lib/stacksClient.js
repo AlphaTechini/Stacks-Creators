@@ -1,39 +1,41 @@
 import { fetchAPI } from './api.js'; // Assuming fetchAPI is exported from api.js
-import { request, signMessage, disconnect as stacksDisconnect, openContractCall } from '@stacks/connect';
+import { AppConfig, UserSession, showConnect, openContractCall, signMessage } from '@stacks/connect';
 import * as StacksTransactions from '@stacks/transactions'; // Keep for cvToHex, etc.
 
-const {
+const appConfig = new AppConfig(['store_write', 'publish_data']);
+export const userSession = new UserSession({ appConfig });
+
+const { // These are still needed for the transaction functions below
   createSTXPostCondition,
   FungibleConditionCode,
   uintCV,
-  cvToHex,
 } = StacksTransactions;
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3800';
 
 export function handleLogin() { 
   showConnect({
     appDetails: {
       name: 'Stacks Creators',
-      icon: window.location.origin + '/logo.svg', // Ensure you have a logo here
+      icon: '/favicon.png'
     },
-    onFinish: async (response) => {
-      const stxAddress = response.addresses.find(addr => addr.address.startsWith('S'))?.address;
-      if (!stxAddress) {
-        console.error('No STX address found in wallet response.');
-        return;
-      }
+    userSession,
+    onFinish: async () => {
+      // This reloads the page and wallet store will pick up the session.
+      // We also need to get a JWT for our backend.
+      const userData = userSession.loadUserData();
+      const address = userData.profile.stxAddress.testnet;
 
       try {
         // The user is signed in, now we need to authenticate with our backend
-        const nonceResponse = await fetch(`${BACKEND_URL}/api/users/nonce?address=${stxAddress}`);
+        const nonceResponse = await fetch(`${BACKEND_URL}/api/users/nonce?address=${address}`);
         if (!nonceResponse.ok) throw new Error('Failed to fetch nonce from server.');
         const { nonce } = await nonceResponse.json();
 
-        const signatureData = await signMessage({ message: nonce });
+        const signatureData = await signMessage({ message: nonce, privateKey: userData.appPrivateKey });
 
         const loginResponse = await fetchAPI('/api/users/login', 'POST', null, {
-          address: stxAddress,
+          address,
           publicKey: signatureData.publicKey,
           signature: signatureData.signature,
           nonce,
@@ -41,28 +43,21 @@ export function handleLogin() {
 
         localStorage.setItem('stacks_token', loginResponse.token);
         console.log('Backend login successful! JWT stored.');
-        // Manually trigger a reload to ensure all stores are updated correctly.
-        location.reload();
       } catch (error) {
         console.error('Login process failed:', error.message);
       } finally {
-        // No need for a reload here as it's handled on success.
+        location.reload();
       }
     },
     onCancel: () => {
       console.log('Login process cancelled by user.');
     }
   });
-
-  function showConnect(options) {
-    request(options, 'getAddresses');
-  }
 }
 
 export function handleLogout() {
   localStorage.removeItem('stacks_token');
-  stacksDisconnect();
-  location.reload();
+  userSession.signUserOut('/');
 }
 
 /**
@@ -72,16 +67,17 @@ export function handleLogout() {
  * @returns {Promise<string>} The hex-encoded signed transaction.
  */
 export async function createListTx(tokenId, price) {
-  const response = await request('stx_callContract', {
-    contract: `${import.meta.env.VITE_CONTRACT_ADDRESS}.${import.meta.env.VITE_STACKS_CONTRACT_NAME_MARKET}`,
-    functionName: 'list-token',
-    functionArgs: [cvToHex(uintCV(tokenId)), cvToHex(uintCV(price))],
-    appDetails: {
-      name: 'Stacks Creators',
-      icon: window.location.origin + '/logo.svg',
-    },
+  return new Promise((resolve, reject) => {
+    openContractCall({
+      contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS,
+      contractName: import.meta.env.VITE_STACKS_CONTRACT_NAME_MARKET,
+      functionName: 'list-token',
+      functionArgs: [uintCV(tokenId), uintCV(price)],
+      userSession,
+      onFinish: (data) => resolve(data.txId),
+      onCancel: () => reject(new Error('Transaction was cancelled.')),
+    });
   });
-  return response.txId;
 }
 
 /**
@@ -92,17 +88,20 @@ export async function createListTx(tokenId, price) {
  * @returns {Promise<string>} The hex-encoded signed transaction.
  */
 export async function createBuyTx(tokenId, price, userAddress) {
-  const response = await request('stx_callContract', {
-    contract: `${import.meta.env.VITE_CONTRACT_ADDRESS}.${import.meta.env.VITE_STACKS_CONTRACT_NAME_MARKET}`,
-    functionName: 'buy-token',
-    functionArgs: [cvToHex(uintCV(tokenId))],
-    postConditions: [createSTXPostCondition(userAddress, FungibleConditionCode.Equal, price)],
-    appDetails: {
-      name: 'Stacks Creators',
-      icon: window.location.origin + '/logo.svg',
-    },
+  return new Promise((resolve, reject) => {
+    openContractCall({
+      contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS,
+      contractName: import.meta.env.VITE_STACKS_CONTRACT_NAME_MARKET,
+      functionName: 'buy-token',
+      functionArgs: [uintCV(tokenId)],
+      userSession,
+      postConditions: [
+        createSTXPostCondition(userAddress, FungibleConditionCode.Equal, price),
+      ],
+      onFinish: (data) => resolve(data.txId),
+      onCancel: () => reject(new Error('Transaction was cancelled.')),
+    });
   });
-  return response.txId;
 }
 
 /**

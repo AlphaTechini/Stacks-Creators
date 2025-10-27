@@ -4,7 +4,7 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "vite dev --force",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
@@ -29,7 +29,7 @@
 		"vite-plugin-devtools-json": "latest"
 	},
 	"dependencies": {
-		"@stacks/connect": "^8.1.0",
-		"@stacks/transactions": "^8.1.0"
+		"@stacks/connect": "~7.2.0",
+		"@stacks/transactions": "~7.2.0"
 	}
 }

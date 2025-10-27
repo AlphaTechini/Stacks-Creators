@@ -1,11 +1,33 @@
-const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+import { wallet } from '$lib/stores/wallet.js';
+import { get } from 'svelte/store';
+
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
 
 /**
  * A helper function to get the authentication token from local storage.
- * @returns {string | null} The JWT token.
+ * It reliably waits for the wallet store to finish loading before returning the token.
+ * @returns {Promise<string | null>} A promise that resolves with the JWT token.
  */
-function getAuthToken() {
-  return localStorage.getItem('stacks_token');
+async function getAuthToken() {
+  const currentWalletState = get(wallet);
+
+  // If the store is already loaded, we can return the token immediately.
+  if (!currentWalletState.isLoading) {
+    return currentWalletState.token;
+  }
+
+  // If the store is still loading, we return a promise that resolves
+  // once the store's state changes and is no longer loading.
+  return new Promise((resolve) => {
+    const unsubscribe = wallet.subscribe((value) => {
+      // This will fire once with the initial loading state,
+      // and then again once the store's load() function completes.
+      if (!value.isLoading) {
+        unsubscribe(); // Clean up the subscription
+        resolve(value.token);
+      }
+    });
+  });
 }
 
 /**
@@ -125,8 +147,8 @@ export async function getNFT(tokenId) {
  * @param {object} profileData The data to sync, e.g., { username, content }.
  * @returns {Promise<any>} The response from the server.
  */
-export function syncCreatorProfile(profileData) {
-  const token = getAuthToken();
+export async function syncCreatorProfile(profileData) {
+  const token = await getAuthToken();
   if (!token) {
     return Promise.reject(new Error('Authentication token not found. Please log in.'));
   }
@@ -140,6 +162,10 @@ export function syncCreatorProfile(profileData) {
  * @returns {Promise<any>} The user's profile data.
  */
 export function fetchCreatorProfile(walletAddress) {
+  // Prevent API calls with an invalid address, which would cause a server error.
+  if (!walletAddress) {
+    return Promise.reject(new Error('Cannot fetch profile without a wallet address.'));
+  }
   // This endpoint doesn't require authentication, so we pass null for the token.
   return fetchAPI('/api/creator/fetch', 'POST', null, { walletAddress });
 }

@@ -1,4 +1,5 @@
-import { verifyMessageSignature } from '@stacks/encryption';
+import StacksEncryption from '@stacks/encryption';
+const { verifyMessageSignature } = StacksEncryption;
 import StacksNetwork from '@stacks/network';
 const { StacksTestnet } = StacksNetwork;
 import { getDB, doc, getDoc } from '../config/firebase.js';
@@ -41,6 +42,7 @@ export default async function userRoutes(fastify, options) {
 				message: nonce,
 				publicKey,
 				signature,
+				network: new StacksTestnet(),
 			});
 
 			if (!verified) {
