@@ -60,58 +60,75 @@ export async function mintNFT(creatorAddress, title, description, aiImageBuffer)
   isMinting = true;
 
   try {
-  const network = getNetwork();
-  // STEP 1: Get the next available token ID directly from the smart contract.
-  // This is the single source of truth for the NFT's ID.
-  const nextTokenIdResult = await callReadOnlyFunction({
-    contractAddress: process.env.STACKS_CONTRACT_ADDRESS,
-    contractName: process.env.STACKS_CONTRACT_NAME_CREATOR,
-    functionName: 'get-last-token-id', // Assuming the contract has a `(define-read-only (get-last-token-id) ...)`
-    functionArgs: [],
-    senderAddress: process.env.STACKS_SENDER_ADDRESS,
-    network,
-  });
-  const lastTokenId = cvToJSON(nextTokenIdResult).value;
-  const tokenId = lastTokenId === null ? 0 : Number(lastTokenId) + 1;
+    const network = getNetwork();
+    
+    // STEP 1: Get the next available token ID directly from the smart contract.
+    const nextTokenIdResult = await callReadOnlyFunction({
+      contractAddress: process.env.STACKS_CONTRACT_ADDRESS,
+      contractName: process.env.STACKS_CONTRACT_NAME_CREATOR,
+      functionName: 'get-last-token-id',
+      functionArgs: [],
+      senderAddress: process.env.STACKS_SENDER_ADDRESS,
+      network,
+    });
+    
+    const lastTokenId = cvToJSON(nextTokenIdResult).value;
+    const tokenId = lastTokenId === null ? 0 : Number(lastTokenId) + 1;
 
-  // STEP 2: Upload media and metadata to Cloudinary using the correct tokenId.
-  const { secure_url: mediaUrl } = await uploadToCloudinary(aiImageBuffer, 'nfts/media', tokenId.toString());
-  // v7 network objects store the URL in `client.baseUrl`
-  const { nonce } = await fetch(`${network.client.baseUrl}/v2/accounts/${process.env.STACKS_SENDER_ADDRESS}`).then(res => res.json());
+    // STEP 2: Upload media and metadata to Cloudinary
+    const { secure_url: mediaUrl } = await uploadToCloudinary(
+      aiImageBuffer, 
+      'nfts/media', 
+      tokenId.toString()
+    );
+    
+    // Get nonce from Stacks API
+    const baseUrl = network.client?.baseUrl || 'https://api.testnet.hiro.so';
+    const accountResponse = await fetch(`${baseUrl}/v2/accounts/${process.env.STACKS_SENDER_ADDRESS}`);
+    const { nonce } = await accountResponse.json();
 
-  // 2. Create and upload metadata JSON to Cloudinary
-  const metadata = { title, description, image: mediaUrl };
-  const metadataBuffer = Buffer.from(JSON.stringify(metadata));
-  const { secure_url: metadataUrl } = await uploadToCloudinary(metadataBuffer, 'nfts/metadata', tokenId.toString());
-  if (!metadataUrl) {
-    throw new Error('Failed to upload metadata file to Cloudinary.');
-  }
+    // Create and upload metadata JSON to Cloudinary
+    const metadata = { title, description, image: mediaUrl };
+    const metadataBuffer = Buffer.from(JSON.stringify(metadata));
+    const { secure_url: metadataUrl } = await uploadToCloudinary(
+      metadataBuffer, 
+      'nfts/metadata', 
+      tokenId.toString()
+    );
+    
+    if (!metadataUrl) {
+      throw new Error('Failed to upload metadata file to Cloudinary.');
+    }
 
-  // STEP 3: Build, sign, and broadcast the Stacks transaction.
-  const senderKey = process.env.STACKS_PRIVATE_KEY;
-  const privateKey = createStacksPrivateKey(process.env.STACKS_PRIVATE_KEY);
+    // STEP 3: Build, sign, and broadcast the Stacks transaction
+    const senderKey = process.env.STACKS_PRIVATE_KEY;
+    const privateKey = createStacksPrivateKey(senderKey);
 
-  const txOptions = {
-    contractAddress: process.env.STACKS_CONTRACT_ADDRESS,
-    contractName: process.env.STACKS_CONTRACT_NAME_CREATOR,
-    functionName: 'mint',
-    functionArgs: [standardPrincipalCV(creatorAddress), stringUtf8CV(metadataUrl)],
-    senderKey,
-    network,
-    anchorMode: AnchorMode.Any,
-    nonce,
-  };
+    const txOptions = {
+      contractAddress: process.env.STACKS_CONTRACT_ADDRESS,
+      contractName: process.env.STACKS_CONTRACT_NAME_CREATOR,
+      functionName: 'mint',
+      functionArgs: [
+        standardPrincipalCV(creatorAddress), 
+        stringUtf8CV(metadataUrl)
+      ],
+      senderKey,
+      network,
+      anchorMode: AnchorMode.Any,
+      nonce,
+    };
 
-  const transaction = await makeContractCall(txOptions);
-  const signer = new TransactionSigner(transaction);
-  signer.signOrigin(privateKey);
+    const transaction = await makeContractCall(txOptions);
+    const signer = new TransactionSigner(transaction);
+    signer.signOrigin(privateKey);
 
-  // 4. Broadcast the transaction
-  const broadcastResult = await broadcastTransaction(transaction);
-  const txId = broadcastResult.txid;
+    // Broadcast the transaction
+    const broadcastResult = await broadcastTransaction(transaction);
+    const txId = broadcastResult.txid;
 
-  // Return only the transaction ID. The listener will handle the DB write.
-  return { txId, mediaUrl };
+    console.log(`[NFTService] NFT minting transaction broadcast. TxID: ${txId}, TokenID: ${tokenId}`);
+
+    return { txId, mediaUrl };
   } finally {
     isMinting = false; // Release the lock
   }
@@ -133,12 +150,23 @@ export async function updateNFTOnMint(eventData, txId) {
     return;
   }
 
-  // In Firestore, the document ID should be the token ID.
-  const nftRef = db.collection('nfts').doc(String(token_id));
-  // Using set with merge:true will create the document if it doesn't exist, or update it if it does.
-  await nftRef.set({ owner: recipient, txId: txId, tokenId: Number(token_id) }, { merge: true });
+  try {
+    // Use the REST API client
+    const nftRef = db.collection('nfts').doc(String(token_id));
+    await nftRef.set(
+      { 
+        owner: recipient, 
+        txId: txId, 
+        tokenId: Number(token_id),
+        listed: false
+      }, 
+      { merge: true }
+    );
 
-  console.log(`[NFTService] Synced NFT #${token_id} for owner ${recipient}.`);
+    console.log(`[NFTService] Synced NFT #${token_id} for owner ${recipient}.`);
+  } catch (error) {
+    console.error('[NFTService] Error updating NFT on mint:', error);
+  }
 }
 
 /**
@@ -148,15 +176,22 @@ export async function updateNFTOnMint(eventData, txId) {
  */
 export async function getNFTsByOwner(ownerAddress) {
   const db = getDB();
-  const nftsRef = db.collection('nfts');
-  const q = nftsRef.where('owner', '==', ownerAddress);
+  
+  try {
+    const nftsRef = db.collection('nfts');
+    const queryRef = nftsRef.where('owner', '==', ownerAddress);
+    const snapshot = await queryRef.get();
 
-  const snapshot = await q.get();
-  if (snapshot.empty) {
+    if (snapshot.empty) {
+      return [];
+    }
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('[NFTService] Error fetching NFTs by owner:', error);
     return [];
   }
-
-  const nfts = [];
-  snapshot.forEach(doc => nfts.push(doc.data()));
-  return nfts;
 }

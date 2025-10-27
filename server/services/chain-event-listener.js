@@ -5,7 +5,6 @@ import { updateNFTOnMint } from './nft.service.js';
 import { getDB } from '../config/firebase.js';
 import 'dotenv/config';
 
-
 /**
  * Simple parser for Clarity tuple data in .repr strings
  */
@@ -37,9 +36,16 @@ async function handlePurchaseEvent(eventData, txId) {
     return;
   }
 
-  const nftRef = db.collection('nfts').doc(String(token_id));
-  await nftRef.update({ owner: buyer, listed: false });
-  console.log(`[Chain-Listener] DB updated for NFT #${token_id}. New owner: ${buyer}`);
+  try {
+    const nftRef = db.collection('nfts').doc(String(token_id));
+    await nftRef.update({ 
+      owner: buyer, 
+      listed: false 
+    });
+    console.log(`[Chain-Listener] DB updated for NFT #${token_id}. New owner: ${buyer}`);
+  } catch (error) {
+    console.error('[Chain-Listener] Error updating purchase:', error);
+  }
 }
 
 /**
@@ -51,7 +57,7 @@ export async function startEventListener() {
 
   const connect = async () => {
     const network = getNetwork();
-    const baseUrl = network.client?.baseUrl || 'https://stacks-node-api.testnet.stacks.co';
+    const baseUrl = network.client?.baseUrl || 'https://api.testnet.hiro.so';
     const wsUrl = baseUrl.replace(/^http/, 'ws') + '/extended/v1/ws';
 
     console.log(`[Chain-Listener] Connecting to WebSocket: ${wsUrl} (Attempt ${retryCount + 1})`);
@@ -62,7 +68,7 @@ export async function startEventListener() {
       console.log('[Chain-Listener] ✅ Connected to Stacks WebSocket.');
       retryCount = 0;
 
-      // Subscribe to all tx updates from the deployer’s address
+      // Subscribe to all tx updates
       ws.send(JSON.stringify({
         event: 'subscribe',
         subscriptions: [{ event: 'tx_update' }]

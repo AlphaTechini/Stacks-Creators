@@ -1,5 +1,5 @@
-import { db, doc, getDoc, getDocs, collection, updateDoc } from '../config/firebase.js';
-import *  as stacksClient from '../utils/stacksClient.cjs';
+import { getDB } from '../config/firebase.js';
+import * as stacksClient from '../utils/stacksClient.cjs';
 const { broadcastTransaction } = stacksClient;
 import StacksTransactions from '@stacks/transactions';
 const { deserializeTransaction } = StacksTransactions;
@@ -10,14 +10,25 @@ const { deserializeTransaction } = StacksTransactions;
  * @param {object} options
  */
 export default async function marketplaceRoutes(fastify, options) {
+  const db = getDB();
+  
   /**
    * GET /api/nfts - Fetches all NFTs from the database.
    */
   fastify.get('/api/nfts', async (request, reply) => {
     try {
-      const nftsCol = collection(db, 'nfts');
-      const nftSnapshot = await getDocs(nftsCol);
-      const nftList = nftSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const nftsCol = db.collection('nfts');
+      const { docs, empty } = await nftsCol.get();
+      
+      if (empty) {
+        return [];
+      }
+      
+      const nftList = docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      }));
+      
       return nftList;
     } catch (error) {
       fastify.log.error(error, 'Error fetching all NFTs');
@@ -31,13 +42,17 @@ export default async function marketplaceRoutes(fastify, options) {
   fastify.get('/api/nft/:tokenId', async (request, reply) => {
     try {
       const { tokenId } = request.params;
-      const nftRef = doc(db, 'nfts', tokenId);
-      const nftDoc = await getDoc(nftRef);
+      const nftRef = db.collection('nfts').doc(tokenId);
+      const nftDoc = await nftRef.get();
 
-      if (!nftDoc.exists()) {
+      if (!nftDoc.exists) {
         return reply.code(404).send({ error: 'NFT not found.' });
       }
-      return { id: nftDoc.id, ...nftDoc.data() };
+      
+      return { 
+        id: nftDoc.id, 
+        ...nftDoc.data() 
+      };
     } catch (error) {
       fastify.log.error(error, 'Error fetching single NFT');
       return reply.code(500).send({ error: 'Failed to fetch NFT data.' });
@@ -49,18 +64,27 @@ export default async function marketplaceRoutes(fastify, options) {
    */
   fastify.post('/api/marketplace/list', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
     const { signedTx } = request.body;
-    const tx = deserializeTransaction(Buffer.from(signedTx, 'hex'));
-    const tokenId = tx.payload.functionArgs[0].value.toString();
-
+    
+    if (!signedTx) {
+      return reply.code(400).send({ error: 'signedTx is required.' });
+    }
+    
     try {
+      const tx = deserializeTransaction(Buffer.from(signedTx, 'hex'));
+      const tokenId = tx.payload.functionArgs[0].value.toString();
+
       const broadcastResult = await broadcastTransaction(tx);
-      const nftRef = doc(db, 'nfts', tokenId);
-      await updateDoc(nftRef, { listed: true });
+      
+      // Update database
+      const nftRef = db.collection('nfts').doc(tokenId);
+      await nftRef.update({ listed: true });
 
       return { success: true, txId: broadcastResult.txid };
     } catch (error) {
       fastify.log.error(error, 'Error broadcasting list transaction');
-      return reply.code(500).send({ error: 'Failed to list NFT.' });
+      return reply.code(500).send({ 
+        error: error.message || 'Failed to list NFT.' 
+      });
     }
   });
 
@@ -70,15 +94,22 @@ export default async function marketplaceRoutes(fastify, options) {
    */
   fastify.post('/api/marketplace/buy', { preHandler: [fastify.requireAuth] }, async (request, reply) => {
     const { signedTx } = request.body;
-    const tx = deserializeTransaction(Buffer.from(signedTx, 'hex'));
-
+    
+    if (!signedTx) {
+      return reply.code(400).send({ error: 'signedTx is required.' });
+    }
+    
     try {
+      const tx = deserializeTransaction(Buffer.from(signedTx, 'hex'));
       const broadcastResult = await broadcastTransaction(tx);
+      
       // No DB update needed here; the chain listener will handle it upon confirmation.
       return { success: true, txId: broadcastResult.txid };
     } catch (error) {
       fastify.log.error(error, 'Error broadcasting buy transaction');
-      return reply.code(500).send({ error: 'Failed to buy NFT.' });
+      return reply.code(500).send({ 
+        error: error.message || 'Failed to buy NFT.' 
+      });
     }
   });
 }

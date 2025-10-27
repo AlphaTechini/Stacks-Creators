@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
+import fastifyJwt from '@fastify/jwt';
 import { startEventListener } from './services/chain-event-listener.js';
 import { verifyToken } from './utils/jwt.js';
 
@@ -23,8 +24,33 @@ fastify.register(cors, {
 
 // Register Multipart plugin for file uploads
 fastify.register(multipart, {
-  // We can add limits here if needed, e.g., fileSize
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    files: 1, // Only allow one file per upload
+  },
 });
+
+// Register JWT plugin (CRITICAL - was missing!)
+fastify.register(fastifyJwt, {
+  secret: process.env.JWT_SECRET || 'your-default-secret-key-for-development'
+});
+
+// --- Environment Variable Validation ---
+const requiredEnvVars = [
+  'JWT_SECRET',
+  'STACKS_CONTRACT_ADDRESS',
+  'STACKS_PRIVATE_KEY',
+  'CLOUDINARY_CLOUD_NAME',
+  'CLOUDINARY_API_KEY',
+  'CLOUDINARY_API_SECRET'
+];
+
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    fastify.log.error(`Missing required environment variable: ${envVar}`);
+    process.exit(1);
+  }
+}
 
 /**
  * A pre-handler hook to verify the JWT from the Authorization header.
@@ -53,13 +79,20 @@ fastify.register(mintRoute);
 fastify.register(marketplaceRoutes);
 fastify.register(uploadRoutes);
 
+// Add a health check endpoint
+fastify.get('/health', async (request, reply) => {
+  return { status: 'ok', timestamp: new Date().toISOString() };
+});
+
 // Start listening for on-chain events
 startEventListener();
 
 // Start the server
 const start = async () => {
   try {
-    await fastify.listen({ port: process.env.PORT || 3800, host: '0.0.0.0' });
+    fastify.log.info('Firebase client configured to use REST API.');
+
+    await fastify.listen({ port: process.env.PORT || 8080, host: '0.0.0.0' });
     fastify.log.info(`Server listening on ${fastify.server.address().port}`);
   } catch (err) {
     fastify.log.error(err);

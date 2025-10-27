@@ -1,6 +1,5 @@
 import { getDB } from '../config/firebase.js';
 import { createHelia } from 'helia';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { unixfs } from '@helia/unixfs';
 import { CID } from 'multiformats/cid';
 
@@ -39,7 +38,6 @@ async function getFromIPFS(cid) {
  */
 export default async function creatorRoutes(fastify, options) {
   /**
-   *
    * POST /api/creator/sync - Syncs user profile data. Content goes to IPFS, metadata to Firestore.
    * Creates a profile if one doesn't exist, otherwise updates it.
    * The wallet address is the primary key, derived from the auth token.
@@ -58,9 +56,9 @@ export default async function creatorRoutes(fastify, options) {
     const db = getDB();
     try {
       const fs = await getFs(); // Ensure Helia is running
-      const userRef = doc(db, 'users', walletAddress);
-      const docSnap = await getDoc(userRef);
-      const user = docSnap.exists() ? docSnap.data() : null;
+      const userRef = db.collection('users').doc(walletAddress);
+      const docSnap = await userRef.get();
+      const user = docSnap.exists ? docSnap.data() : null;
       let newCid = user?.cid || null;
 
       // If new content is provided, upload it to IPFS to get a new CID.
@@ -78,8 +76,7 @@ export default async function creatorRoutes(fastify, options) {
       };
 
       // Use `set` with `merge: true` to create or update the document in Firestore.
-      // This ensures we don't overwrite fields that aren't provided in the request.
-      await setDoc(userRef, profileData, { merge: true });
+      await userRef.set(profileData, { merge: true });
 
       const response = {
         walletAddress: profileData.walletAddress,
@@ -88,7 +85,7 @@ export default async function creatorRoutes(fastify, options) {
       };
 
       return reply.code(user ? 200 : 201).send(response);
-    } catch (error) { // eslint-disable-line no-unused-vars
+    } catch (error) {
       fastify.log.error(error, 'Error syncing creator profile');
       return reply.code(500).send({ error: 'An error occurred during profile sync.' });
     }
@@ -107,10 +104,10 @@ export default async function creatorRoutes(fastify, options) {
     }
 
     const db = getDB();
-    const userRef = doc(db, 'users', walletAddress);
-    const docSnap = await getDoc(userRef);
+    const userRef = db.collection('users').doc(walletAddress);
+    const docSnap = await userRef.get();
 
-    if (!docSnap.exists()) {
+    if (!docSnap.exists) {
       return reply.code(404).send({ error: 'User not found.' });
     }
 
@@ -121,8 +118,14 @@ export default async function creatorRoutes(fastify, options) {
       return { walletAddress, username: user.username, content: null };
     }
 
-    const content = await getFromIPFS(user.cid);
-    // The content from IPFS is a JSON string, so we parse it.
-    return { walletAddress, username: user.username, content: JSON.parse(content) };
+    try {
+      const content = await getFromIPFS(user.cid);
+      // The content from IPFS is a JSON string, so we parse it.
+      return { walletAddress, username: user.username, content: JSON.parse(content) };
+    } catch (error) {
+      fastify.log.error(error, 'Error fetching content from IPFS');
+      // Return profile without content if IPFS fails
+      return { walletAddress, username: user.username, content: null };
+    }
   });
 }

@@ -1,8 +1,9 @@
 import StacksEncryption from '@stacks/encryption';
 const { verifyMessageSignature } = StacksEncryption;
 import StacksNetwork from '@stacks/network';
-const { StacksTestnet } = StacksNetwork;
-import { getDB, doc, getDoc } from '../config/firebase.js';
+const { StacksTestnet, StacksMainnet } = StacksNetwork;
+import { getDB } from '../config/firebase.js';
+import { generateToken } from '../utils/jwt.js';
 
 /**
  * Fastify plugin for user authentication.
@@ -22,7 +23,7 @@ export default async function userRoutes(fastify, options) {
 			return reply.code(400).send({ error: 'Wallet address is required.' });
 		}
 		// In a real app, you'd generate and store a unique, single-use nonce.
-		// For this example, we'll use a static but descriptive message.
+		// For this example, we'll use a timestamp-based nonce.
 		const nonce = `Sign this message to log in to Stacks Creators. Nonce: ${Date.now()}`;
 		return { nonce };
 	});
@@ -38,11 +39,13 @@ export default async function userRoutes(fastify, options) {
 		}
 
 		try {
+			const network = process.env.STACKS_NETWORK === 'mainnet' ? new StacksMainnet() : new StacksTestnet();
+			
 			const verified = verifyMessageSignature({
 				message: nonce,
 				publicKey,
 				signature,
-				network: new StacksTestnet(),
+				network,
 			});
 
 			if (!verified) {
@@ -50,13 +53,13 @@ export default async function userRoutes(fastify, options) {
 			}
 
 			// Signature is valid, generate a JWT.
-			const token = fastify.jwt.sign({ sub: address }); // 'sub' (subject) is the standard claim for user ID
+			const token = generateToken(address);
 
 			// Optional: Check if user exists in Firestore
-			const userRef = doc(db, 'users', address);
-			const docSnap = await getDoc(userRef);
+			const userRef = db.collection('users').doc(address);
+			const docSnap = await userRef.get();
 
-			return { token, isNewUser: !docSnap.exists() };
+			return { token, isNewUser: !docSnap.exists };
 		} catch (error) {
 			fastify.log.error(error, 'Error during login verification');
 			return reply.code(500).send({ error: 'An error occurred during login.' });
